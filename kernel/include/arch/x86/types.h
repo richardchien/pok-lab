@@ -15,7 +15,7 @@
  */
 
 
-#ifndef __POK_x86_TYPES_H__
+#ifndef __POK_X86_TYPES_H__
 #define __POK_X86_TYPES_H__
 
 typedef unsigned short        uint8_t;

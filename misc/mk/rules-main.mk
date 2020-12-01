@@ -7,8 +7,11 @@ assemble-partitions:
 # padding to get aligned file size (needed for SPARC)
 	for v in $(PARTITIONS); do \
 		dd if=/dev/zero of=$$v oflag=append conv=notrunc bs=1 count=`echo "4 - (\`ls -l $$v | awk '{print $$5}'\` % 4)" | bc` > /dev/null 2> /dev/null;\
+		echo 1;\
 	done
+	echo 2
 	cat $(PARTITIONS) > partitions.bin
+	echo 3
 	if test $$? -eq 0; then $(ECHO) $(ECHO_FLAGS) $(ECHO_GREEN) " OK "; else $(ECHO) $(ECHO_FLAGS) $(ECHO_RED) " KO"; fi
 
 

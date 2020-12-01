@@ -1,0 +1,12 @@
+.vscode
+*.o
+*.a
+*.elf
+*.bin
+*.img
+*.lo
+*.map
+.depend.mk
+.depend
+config.mk
+examples
