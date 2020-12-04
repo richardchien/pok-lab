@@ -1,6 +1,6 @@
 /*
  *                               POK header
- * 
+ *
  * The following file is a part of the POK project. Any modification should
  * made according to the POK licence. You CANNOT use this file or a part of
  * this file is this part of a file for your own project
@@ -9,9 +9,9 @@
  *
  * Please follow the coding guidelines described in doc/CODING_GUIDELINES
  *
- *                                      Copyright (c) 2007-2009 POK team 
+ *                                      Copyright (c) 2007-2009 POK team
  *
- * Created by laurent on Tue Dec 22 14:57:52 2009 
+ * Created by laurent on Tue Dec 22 14:57:52 2009
  */
 
 #include <arinc653/types.h>
@@ -31,24 +31,21 @@ pingpong__integer pr2_pdatain_dvalue;
 extern SAMPLING_PORT_ID_TYPE pr2_pdatain_id;
 
 /**************/
-/* thr_job   */ 
+/* thr_job   */
 /*************/
 
-void* thr_job ()
-{
-  pingpong__integer pr2_pdatain_dvalue;
+void* thr_job() {
+    pingpong__integer pr2_pdatain_dvalue;
 
-  RETURN_CODE_TYPE ret;
-  VALIDITY_TYPE pr2_pdatain_valid;
-  MESSAGE_SIZE_TYPE pr2_pdatain_length;
-  while (1)
-  {
-    /*  Get the IN ports values*/
-    READ_SAMPLING_MESSAGE (pr2_pdatain_id, &(pr2_pdatain_dvalue), &(pr2_pdatain_length), &(pr2_pdatain_valid), &(ret));
-    /*  Call implementation*/
-    pingpong__hello_part2 (pr2_pdatain_dvalue);
-    PERIODIC_WAIT (&(ret));
-  }
+    RETURN_CODE_TYPE ret;
+    VALIDITY_TYPE pr2_pdatain_valid;
+    MESSAGE_SIZE_TYPE pr2_pdatain_length;
+    while (1) {
+        /*  Get the IN ports values*/
+        READ_SAMPLING_MESSAGE(
+            pr2_pdatain_id, &(pr2_pdatain_dvalue), &(pr2_pdatain_length), &(pr2_pdatain_valid), &(ret));
+        /*  Call implementation*/
+        pingpong__hello_part2(pr2_pdatain_dvalue);
+        PERIODIC_WAIT(&(ret));
+    }
 }
-
-

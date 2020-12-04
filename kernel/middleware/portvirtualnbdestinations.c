@@ -1,6 +1,6 @@
 /*
  *                               POK header
- * 
+ *
  * The following file is a part of the POK project. Any modification should
  * made according to the POK licence. You CANNOT use this file or a part of
  * this file is this part of a file for your own project
@@ -9,9 +9,9 @@
  *
  * Please follow the coding guidelines described in doc/CODING_GUIDELINES
  *
- *                                      Copyright (c) 2007-2009 POK team 
+ *                                      Copyright (c) 2007-2009 POK team
  *
- * Created by julien on Tue Sep  8 07:39:08 2009 
+ * Created by julien on Tue Sep  8 07:39:08 2009
  */
 
 #ifdef POK_NEEDS_PORTS_VIRTUAL
@@ -24,30 +24,27 @@
 #include <middleware/queue.h>
 #include <libc.h>
 
-extern uint8_t          pok_ports_nb_destinations[POK_CONFIG_NB_PORTS];              /**  from deployment.c when using code generation */
-extern uint8_t          pok_ports_nb_ports_by_partition[POK_CONFIG_NB_PARTITIONS];   /**  from deployment.c when using code generation */
-extern uint8_t          pok_ports_kind[POK_CONFIG_NB_PORTS];
+extern uint8_t pok_ports_nb_destinations[POK_CONFIG_NB_PORTS]; /**  from deployment.c when using code generation */
+extern uint8_t
+    pok_ports_nb_ports_by_partition[POK_CONFIG_NB_PARTITIONS]; /**  from deployment.c when using code generation */
+extern uint8_t pok_ports_kind[POK_CONFIG_NB_PORTS];
 
-pok_ret_t pok_port_virtual_nb_destinations (const pok_port_id_t id, uint32_t* result)
-{
-   if (id >= POK_CONFIG_NB_PORTS)
-   {
-      return POK_ERRNO_PORT;
-   }
+pok_ret_t pok_port_virtual_nb_destinations(const pok_port_id_t id, uint32_t* result) {
+    if (id >= POK_CONFIG_NB_PORTS) {
+        return POK_ERRNO_PORT;
+    }
 
-   if (! pok_own_port (POK_SCHED_CURRENT_PARTITION, id))
-   {
-      return POK_ERRNO_PORT;
-   }
+    if (!pok_own_port(POK_SCHED_CURRENT_PARTITION, id)) {
+        return POK_ERRNO_PORT;
+    }
 
-   if (pok_ports_kind[id] != POK_PORT_KIND_VIRTUAL)
-   {
-      return POK_ERRNO_PORT;
-   }
+    if (pok_ports_kind[id] != POK_PORT_KIND_VIRTUAL) {
+        return POK_ERRNO_PORT;
+    }
 
-   *result = pok_ports_nb_destinations[id];
+    *result = pok_ports_nb_destinations[id];
 
-   return POK_ERRNO_OK;
+    return POK_ERRNO_OK;
 }
 
 #endif

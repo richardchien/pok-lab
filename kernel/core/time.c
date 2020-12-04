@@ -1,6 +1,6 @@
 /*
  *                               POK header
- * 
+ *
  * The following file is a part of the POK project. Any modification should
  * made according to the POK licence. You CANNOT use this file or a part of
  * this file is this part of a file for your own project
@@ -9,9 +9,9 @@
  *
  * Please follow the coding guidelines described in doc/CODING_GUIDELINES
  *
- *                                      Copyright (c) 2007-2009 POK team 
+ *                                      Copyright (c) 2007-2009 POK team
  *
- * Created by julien on Thu Jan 15 23:34:13 2009 
+ * Created by julien on Thu Jan 15 23:34:13 2009
  */
 
 /**
@@ -21,7 +21,7 @@
  * \date    2008-2009
  */
 
-#if defined (POK_NEEDS_TIME) || defined (POK_NEEDS_SCHED) || defined (POK_NEEDS_THREADS)
+#if defined(POK_NEEDS_TIME) || defined(POK_NEEDS_SCHED) || defined(POK_NEEDS_THREADS)
 
 #include <bsp.h>
 #include <types.h>
@@ -44,12 +44,10 @@ uint64_t pok_tick_counter = 0;
  * Call BSP-defined function to initialize
  * the timing service.
  */
-void pok_time_init (void)
-{
-   pok_tick_counter = 0;
-   pok_bsp_time_init ();
+void pok_time_init(void) {
+    pok_tick_counter = 0;
+    pok_bsp_time_init();
 }
-
 
 #ifdef POK_NEEDS_GETTICK
 /**
@@ -58,10 +56,9 @@ void pok_time_init (void)
  * Returns POK_ERRNO_OK
  * Need the GETTICK service (POK_NEEDS_GETTICKS maccro)
  */
-pok_ret_t pok_gettick_by_pointer (uint64_t* clk_val)
-{
-   *clk_val = POK_GETTICK();
-   return POK_ERRNO_OK;
+pok_ret_t pok_gettick_by_pointer(uint64_t* clk_val) {
+    *clk_val = POK_GETTICK();
+    return POK_ERRNO_OK;
 }
 #endif
 

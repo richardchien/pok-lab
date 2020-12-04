@@ -1,6 +1,6 @@
 /*
  *                               POK header
- * 
+ *
  * The following file is a part of the POK project. Any modification should
  * made according to the POK licence. You CANNOT use this file or a part of
  * this file is this part of a file for your own project
@@ -9,9 +9,9 @@
  *
  * Please follow the coding guidelines described in doc/CODING_GUIDELINES
  *
- *                                      Copyright (c) 2007-2009 POK team 
+ *                                      Copyright (c) 2007-2009 POK team
  *
- * Created by julien on Thu Jan 15 23:34:13 2009 
+ * Created by julien on Thu Jan 15 23:34:13 2009
  */
 
 #include <core/dependencies.h>
@@ -24,42 +24,33 @@
 #include <libc/string.h>
 #include <middleware/blackboard.h>
 
-extern pok_blackboard_t    pok_blackboards[POK_CONFIG_NB_BLACKBOARDS];
-extern char                pok_blackboards_data[1024];
+extern pok_blackboard_t pok_blackboards[POK_CONFIG_NB_BLACKBOARDS];
+extern char pok_blackboards_data[1024];
 
+pok_ret_t pok_blackboard_display(const pok_blackboard_id_t id, const void* message, const pok_port_size_t len) {
+    if (id > POK_CONFIG_NB_BLACKBOARDS) {
+        return POK_ERRNO_EINVAL;
+    }
 
-pok_ret_t pok_blackboard_display (const pok_blackboard_id_t   id, 
-                                  const void*                 message, 
-                                  const pok_port_size_t       len)
-{
+    if (message == NULL) {
+        return POK_ERRNO_EINVAL;
+    }
 
-   if (id > POK_CONFIG_NB_BLACKBOARDS)
-   {
-      return POK_ERRNO_EINVAL;
-   }
+    if (len > pok_blackboards[id].size) {
+        return POK_ERRNO_SIZE;
+    }
 
-   if (message == NULL)
-   {
-      return POK_ERRNO_EINVAL;
-   }
+    if (pok_blackboards[id].ready != TRUE) {
+        return POK_ERRNO_EINVAL;
+    }
 
-   if (len > pok_blackboards[id].size)
-   {
-      return POK_ERRNO_SIZE;
-   }
+    pok_event_lock(pok_blackboards[id].lock);
 
-   if (pok_blackboards[id].ready != TRUE)
-   {
-      return POK_ERRNO_EINVAL;
-   }
+    memcpy(&pok_blackboards_data[pok_blackboards[id].index], message, len);
 
-   pok_event_lock (pok_blackboards[id].lock);
+    pok_event_unlock(pok_blackboards[id].lock);
 
-   memcpy (&pok_blackboards_data[pok_blackboards[id].index], message, len);
-
-   pok_event_unlock (pok_blackboards[id].lock);
-
-   return POK_ERRNO_OK;
+    return POK_ERRNO_OK;
 }
 
 #endif

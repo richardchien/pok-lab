@@ -1,6 +1,6 @@
 /*
  *                               POK header
- * 
+ *
  * The following file is a part of the POK project. Any modification should
  * made according to the POK licence. You CANNOT use this file or a part of
  * this file is this part of a file for your own project
@@ -9,16 +9,16 @@
  *
  * Please follow the coding guidelines described in doc/CODING_GUIDELINES
  *
- *                                      Copyright (c) 2007-2009 POK team 
+ *                                      Copyright (c) 2007-2009 POK team
  *
- * Created by julien on Wed Feb 25 22:07:02 2009 
+ * Created by julien on Wed Feb 25 22:07:02 2009
  */
 
 /********
-* ec2c version 0.5
-* c header file generated for node : inc 
-* to be used with : inc.c 
-********/
+ * ec2c version 0.5
+ * c header file generated for node : inc
+ * to be used with : inc.c
+ ********/
 /*-------- Predefined types ---------*/
 #ifndef _inc_EC2C_PREDEF_TYPES
 #define _inc_EC2C_PREDEF_TYPES
@@ -32,9 +32,9 @@ typedef float _float;
 #define _true 1
 #endif
 /*--------- Pragmas ----------------*/
-//MODULE: inc 1 1
-//IN: _integer n
-//OUT: _integer r
+// MODULE: inc 1 1
+// IN: _integer n
+// OUT: _integer r
 #ifndef _inc_EC2C_SRC_FILE
 /*--------Context type -------------*/
 struct inc_ctx;

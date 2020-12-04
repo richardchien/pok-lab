@@ -1,6 +1,6 @@
 /*
  *                               POK header
- * 
+ *
  * The following file is a part of the POK project. Any modification should
  * made according to the POK licence. You CANNOT use this file or a part of
  * this file is this part of a file for your own project
@@ -9,9 +9,9 @@
  *
  * Please follow the coding guidelines described in doc/CODING_GUIDELINES
  *
- *                                      Copyright (c) 2007-2009 POK team 
+ *                                      Copyright (c) 2007-2009 POK team
  *
- * Created by julien on Thu Jul 30 15:49:30 2009 
+ * Created by julien on Thu Jul 30 15:49:30 2009
  */
 
 #include <core/dependencies.h>
@@ -21,8 +21,7 @@
 #include <types.h>
 #include <core/allocator.h>
 
-void *malloc(size_t size)
-{
-   return pok_allocator_allocate (size);
+void *malloc(size_t size) {
+    return pok_allocator_allocate(size);
 }
 #endif

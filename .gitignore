@@ -9,4 +9,4 @@
 .depend.mk
 .depend
 config.mk
-examples
+examples/**/sizes.c
