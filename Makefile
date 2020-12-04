@@ -62,4 +62,7 @@ testrelease: release
 	$(RM) -r $(TMPDIR)
 #8-> END CUT
 
+format:
+	$(V)find . -iname '*.h' -o -iname '*.c' | xargs clang-format -i -style=file
+
 -include $(POK_PATH)/misc/mk/rules-common.mk
