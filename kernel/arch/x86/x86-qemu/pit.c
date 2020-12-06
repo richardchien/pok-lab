@@ -45,8 +45,7 @@ INTERRUPT_HANDLER(pit_interrupt) {
 }
 
 pok_ret_t pok_x86_qemu_timer_init() {
-    pok_counter_ns_incr = 9219; // 9219 because it is 11 (integer division OSCILLATOR_RATE / POK_TIMER_FREQUENCY)
-                                // divided (floating point) by 1193182 multiplied by 19e9
+    pok_counter_ns_incr = 1000000; // XXX: increased by us, to make things faster
     pok_quantum_incr = POK_TIMER_QUANTUM * pok_counter_ns_incr;
     outb(PIT_BASE + 3, 0x34); /* Channel0, rate generator, Set LSB then MSB */
     outb(PIT_BASE, (OSCILLATOR_RATE / POK_TIMER_FREQUENCY) & 0xff);

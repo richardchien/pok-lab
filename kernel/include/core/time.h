@@ -30,7 +30,7 @@
 /**
  * POK timer quantum
  */
-#define POK_TIMER_QUANTUM 1000
+#define POK_TIMER_QUANTUM 300 // XXX: decreased by us, to make scheding more frequent
 
 extern uint64_t pok_tick_counter;
 
