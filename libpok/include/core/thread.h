@@ -41,8 +41,8 @@ typedef struct {
 
 void pok_thread_init(void);
 pok_ret_t pok_thread_create(uint32_t* thread_id, const pok_thread_attr_t* attr);
-pok_ret_t pok_thread_sleep(const pok_time_t ms);
-pok_ret_t pok_thread_sleep_until(const pok_time_t ms);
+pok_ret_t pok_thread_sleep(const pok_time_t tick);
+pok_ret_t pok_thread_sleep_until(const pok_time_t tick);
 pok_ret_t pok_thread_lock();
 pok_ret_t pok_thread_unlock(const uint32_t thread_id);
 pok_ret_t pok_thread_yield();

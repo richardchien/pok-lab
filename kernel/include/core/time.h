@@ -25,19 +25,20 @@
 /**
  * The rate of the clock in POK
  */
-#define POK_TIMER_FREQUENCY 100000
+#define POK_TIMER_FREQUENCY 1000
 
 /**
  * POK timer quantum
  */
-#define POK_TIMER_QUANTUM 300 // XXX: decreased by us, to make scheding more frequent
+#define POK_TIMER_QUANTUM 50
 
 extern uint64_t pok_tick_counter;
 
-#define CLOCK_HANDLER          \
+// comment out this since we don't use it on x86
+/* #define CLOCK_HANDLER          \
     pok_tick_counter += 10000; \
     pok_sched(); // 10000 because freq (POK_TIMER_FREQUENCY) is 10e5 and time (pok_tick_counter) is in nanoseconds:
-                 // 10e9/POK_TIMER_FREQUENCY
+                 // 10e9/POK_TIMER_FREQUENCY */
 
 #define POK_GETTICK() pok_tick_counter
 
