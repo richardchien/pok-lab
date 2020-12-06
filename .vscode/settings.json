@@ -1,0 +1,11 @@
+{
+    "files.exclude": {
+        "**/*.o": true,
+        "**/*.a": true,
+        "**/*.lo": true,
+        "**/*.bin": true,
+        "**/*.elf": true,
+        "**/*.img": true,
+        "**/*.map": true
+    }
+}
