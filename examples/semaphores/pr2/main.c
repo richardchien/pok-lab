@@ -14,6 +14,7 @@
  * Created by julien on Thu Jan 15 23:34:13 2009
  */
 
+#include <libc/stdio.h>
 #include <core/thread.h>
 #include <core/partition.h>
 #include <types.h>

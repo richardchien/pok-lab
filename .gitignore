@@ -10,3 +10,4 @@
 .depend
 config.mk
 examples/**/sizes.c
+qemu.pid
