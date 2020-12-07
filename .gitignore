@@ -12,3 +12,4 @@ config.mk
 examples/**/sizes.c
 mygarbage/**/sizes.c
 qemu.pid
+*.log
