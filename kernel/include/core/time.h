@@ -30,7 +30,7 @@
 /**
  * POK timer quantum
  */
-#define POK_TIMER_QUANTUM 50
+#define POK_TIMER_QUANTUM 20
 
 extern uint64_t pok_tick_counter;
 

@@ -207,6 +207,7 @@ uint32_t pok_elect_thread(uint8_t new_partition_id) {
         if ((thread->state == POK_STATE_WAIT_NEXT_ACTIVATION) && (thread->next_activation <= now)) {
             thread->state = POK_STATE_RUNNABLE;
             thread->remaining_time_capacity = thread->time_capacity;
+            // printf("%s, Thread %d of partition %d refill time slice\n", __func__, i, new_partition_id);
             thread->next_activation = thread->next_activation + thread->period;
         }
     }
@@ -243,11 +244,11 @@ uint32_t pok_elect_thread(uint8_t new_partition_id) {
             && (POK_SCHED_CURRENT_THREAD != POK_CURRENT_PARTITION.thread_error)
 #endif
         ) {
-            if (POK_CURRENT_THREAD.remaining_time_capacity > 0) {
-                POK_CURRENT_THREAD.remaining_time_capacity = POK_CURRENT_THREAD.remaining_time_capacity - 1;
-            } else if (POK_CURRENT_THREAD.time_capacity > 0) // Wait next activation only for thread
-                                                             // with non-infinite capacity (could be
-                                                             // infinite with value -1 <--> INFINITE_TIME_CAPACITY)
+            POK_CURRENT_THREAD.remaining_time_capacity = POK_CURRENT_THREAD.remaining_time_capacity - 1;
+            if (POK_CURRENT_THREAD.remaining_time_capacity == 0
+                && POK_CURRENT_THREAD.time_capacity > 0) // Wait next activation only for thread
+                                                         // with non-infinite capacity (could be
+                                                         // infinite with value -1 <--> INFINITE_TIME_CAPACITY)
             {
                 POK_CURRENT_THREAD.state = POK_STATE_WAIT_NEXT_ACTIVATION;
             }
@@ -289,6 +290,8 @@ void pok_sched() {
     uint32_t elected_thread = 0;
     uint8_t elected_partition = POK_SCHED_CURRENT_PARTITION;
 
+    // printf("pok_sched\n");
+
 #ifdef POK_NEEDS_SCHED_HFPPS
     uint64_t now = POK_GETTICK();
     elected_thread = current_thread;
@@ -314,6 +317,10 @@ void pok_sched() {
             pok_partitions[pok_current_partition].prev_thread = pok_partitions[pok_current_partition].current_thread;
         }
         pok_partitions[pok_current_partition].current_thread = elected_thread;
+        printf("Thread %d of partition %d scheduled at %d\n",
+               elected_thread - pok_partitions[pok_current_partition].thread_index_low,
+               pok_current_partition,
+               POK_GETTICK());
     }
     pok_sched_context_switch(elected_thread);
 }
