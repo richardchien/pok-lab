@@ -38,7 +38,7 @@ INTERRUPT_HANDLER(pit_interrupt) {
     pok_pic_eoi(PIT_IRQ);
 
     pok_tick_counter += 1;
-    if (pok_tick_counter - pok_prev_tick_value >= POK_TIMER_QUANTUM) {
+    if (pok_tick_counter - pok_prev_tick_value >= POK_SCHED_INTERVAL) {
         pok_prev_tick_value = pok_tick_counter;
         pok_sched();
     }

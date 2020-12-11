@@ -27,11 +27,6 @@
  */
 #define POK_TIMER_FREQUENCY 1000
 
-/**
- * POK timer quantum
- */
-#define POK_TIMER_QUANTUM 20
-
 extern uint64_t pok_tick_counter;
 
 // comment out this since we don't use it on x86

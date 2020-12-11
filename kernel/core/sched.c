@@ -205,9 +205,12 @@ uint32_t pok_elect_thread(uint8_t new_partition_id) {
 #endif
 
         if ((thread->state == POK_STATE_WAIT_NEXT_ACTIVATION) && (thread->next_activation <= now)) {
+            printf("Thread %u.%u activated at %u\n",
+                   (unsigned)pok_current_partition,
+                   (unsigned)i,
+                   (unsigned)POK_GETTICK());
             thread->state = POK_STATE_RUNNABLE;
             thread->remaining_time_capacity = thread->time_capacity;
-            // printf("%s, Thread %d of partition %d refill time slice\n", __func__, i, new_partition_id);
             thread->next_activation = thread->next_activation + thread->period;
         }
     }
@@ -244,12 +247,22 @@ uint32_t pok_elect_thread(uint8_t new_partition_id) {
             && (POK_SCHED_CURRENT_THREAD != POK_CURRENT_PARTITION.thread_error)
 #endif
         ) {
-            POK_CURRENT_THREAD.remaining_time_capacity = POK_CURRENT_THREAD.remaining_time_capacity - 1;
-            if (POK_CURRENT_THREAD.remaining_time_capacity == 0
-                && POK_CURRENT_THREAD.time_capacity > 0) // Wait next activation only for thread
-                                                         // with non-infinite capacity (could be
-                                                         // infinite with value -1 <--> INFINITE_TIME_CAPACITY)
+            if (POK_CURRENT_THREAD.remaining_time_capacity > 0) {
+                printf("Thread %u.%u running at %u\n",
+                       (unsigned)pok_current_partition,
+                       (unsigned)(current_thread - POK_CURRENT_PARTITION.thread_index_low),
+                       (unsigned)now);
+                POK_CURRENT_THREAD.remaining_time_capacity =
+                    POK_CURRENT_THREAD.remaining_time_capacity - POK_SCHED_INTERVAL;
+            } else if (POK_CURRENT_THREAD.time_capacity > 0) // Wait next activation only for thread
+                                                             // with non-infinite capacity (could be
+                                                             // infinite with value -1 <--> INFINITE_TIME_CAPACITY)
             {
+                printf("Thread %u.%u finished at %u, next activation: %u\n",
+                       (unsigned)pok_current_partition,
+                       (unsigned)(current_thread - POK_CURRENT_PARTITION.thread_index_low),
+                       (unsigned)now,
+                       (unsigned)POK_CURRENT_THREAD.next_activation);
                 POK_CURRENT_THREAD.state = POK_STATE_WAIT_NEXT_ACTIVATION;
             }
         }
@@ -317,9 +330,9 @@ void pok_sched() {
             pok_partitions[pok_current_partition].prev_thread = pok_partitions[pok_current_partition].current_thread;
         }
         pok_partitions[pok_current_partition].current_thread = elected_thread;
-        printf("Thread %d of partition %d scheduled at %d\n",
-               elected_thread - pok_partitions[pok_current_partition].thread_index_low,
+        printf("Thread %d.%d scheduled at %d\n",
                pok_current_partition,
+               elected_thread - POK_CURRENT_PARTITION.thread_index_low,
                POK_GETTICK());
     }
     pok_sched_context_switch(elected_thread);

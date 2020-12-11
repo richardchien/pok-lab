@@ -2,7 +2,7 @@
 
 ## 时钟
 
-已经修改过，现在是 1 ms 触发一次时钟中断（1 个 tick），`POK_TIMER_QUANTUM`（20）次时钟中断后触发 `pok_sched`，如果一个线程正在运行，会给 `thread->remaining_time_capacity` 减 1（初始是 `POK_THREAD_DEFAULT_TIME_CAPACITY`，目前设置为 10），然后触发分区的调度函数。也就是说一个线程在 RR 调度算法下每次被调度后可以连续运行 200 tick。
+已经修改过，现在是 1 ms 触发一次时钟中断（1 个 tick），`POK_SCHED_INTERVAL`（20）次时钟中断后触发 `pok_sched`，如果一个线程正在运行，会给 `thread->remaining_time_capacity` 减 `POK_SCHED_INTERVAL`，然后触发分区的调度函数。
 
 ## RR 调度
 
