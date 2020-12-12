@@ -39,6 +39,8 @@
 #include <core/instrumentation.h>
 #include <core/time.h>
 
+#include <core/lab_sched.h>
+
 #include <libc.h>
 
 /**
@@ -61,6 +63,19 @@ void pok_partition_setup_scheduler(const uint8_t pid) {
         pok_partitions[pid].sched_func = &pok_sched_part_rms;
         break;
 #endif
+
+    case POK_LAB_SCHED_PRIO:
+        pok_partitions[pid].sched_func = &pok_lab_sched_part_prio;
+        break;
+    case POK_LAB_SCHED_EDF:
+        pok_partitions[pid].sched_func = &pok_lab_sched_part_edf;
+        break;
+    case POK_LAB_SCHED_RR:
+        pok_partitions[pid].sched_func = &pok_lab_sched_part_rr;
+        break;
+    case POK_LAB_SCHED_WRR:
+        pok_partitions[pid].sched_func = &pok_lab_sched_part_wrr;
+        break;
 
         /*
          * Default scheduling algorithm is Round Robin.
