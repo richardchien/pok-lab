@@ -332,10 +332,14 @@ void pok_sched() {
             pok_partitions[pok_current_partition].prev_thread = pok_partitions[pok_current_partition].current_thread;
         }
         pok_partitions[pok_current_partition].current_thread = elected_thread;
-        printf("Thread %d.%d scheduled at %d\n",
-               pok_current_partition,
-               elected_thread - POK_CURRENT_PARTITION.thread_index_low,
-               POK_GETTICK());
+        if (elected_thread == IDLE_THREAD) {
+            printf("Idle at %d...\n", (unsigned)POK_GETTICK());
+        } else {
+            printf("Thread %d.%d scheduled at %d\n",
+                   (unsigned)pok_current_partition,
+                   (unsigned)(elected_thread - POK_CURRENT_PARTITION.thread_index_low),
+                   (unsigned)POK_GETTICK());
+        }
     }
     pok_sched_context_switch(elected_thread);
 }
