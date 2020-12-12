@@ -56,8 +56,10 @@ uint32_t pok_lab_sched_part_edf(const uint32_t index_low, const uint32_t index_h
     return select_thread_by_property(deadline_cmp, index_low, index_high, prev_thread, current_thread);
 }
 
-uint32_t pok_lab_sched_part_rr(const uint32_t index_low, const uint32_t index_high, const uint32_t prev_thread,
-                               const uint32_t current_thread) {
+typedef uint64_t rr_budget_getter_fn(uint32_t t);
+
+static uint32_t select_thread_rr(rr_budget_getter_fn budget_getter, const uint32_t index_low, const uint32_t index_high,
+                                 const uint32_t prev_thread, const uint32_t current_thread) {
     uint32_t res;
     uint32_t from;
 
@@ -87,18 +89,27 @@ uint32_t pok_lab_sched_part_rr(const uint32_t index_low, const uint32_t index_hi
 
     if (res != IDLE_THREAD) {
         /* Refill RR budget for the selected thread */
-        pok_threads[res].rr_budget = POK_LAB_SCHED_RR_BUDGET;
+        pok_threads[res].rr_budget = budget_getter(res);
     }
 
     return res;
 }
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
+static uint64_t rr_budget_getter(uint32_t t) {
+    (void)t;
+    return POK_LAB_SCHED_RR_BUDGET;
+}
+
+uint32_t pok_lab_sched_part_rr(const uint32_t index_low, const uint32_t index_high, const uint32_t prev_thread,
+                               const uint32_t current_thread) {
+    return select_thread_rr(rr_budget_getter, index_low, index_high, prev_thread, current_thread);
+}
+
+static uint64_t wrr_budget_getter(uint32_t t) {
+    return pok_threads[t].weight * POK_LAB_SCHED_RR_BUDGET;
+}
 
 uint32_t pok_lab_sched_part_wrr(const uint32_t index_low, const uint32_t index_high, const uint32_t prev_thread,
                                 const uint32_t current_thread) {
-    return IDLE_THREAD;
+    return select_thread_rr(wrr_budget_getter, index_low, index_high, prev_thread, current_thread);
 }
-
-#pragma GCC diagnostic pop

@@ -31,6 +31,7 @@
 
 typedef struct {
     uint8_t priority;
+    uint8_t weight;
     void* entry;
     uint64_t period;
     uint64_t deadline;

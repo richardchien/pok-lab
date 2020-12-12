@@ -288,6 +288,8 @@ Thread 0.2 finished at 1000, deadline met, next activation: 1600
 要实现 EDF 调度，实际上就是在每次选择线程时选择当前 deadline 最近的线程，由于此逻辑与优先级调度非常接近，都是从所有线程中选择“最XX”的，于是提取了一个 `select_thread_by_property` 函数，通过传入比较函数来控制选择策略，然后利用此函数来实现 EDF 调度函数 `pok_lab_sched_part_edf`，具体实现如下：
 
 ```cpp
+typedef int thread_comparator_fn(uint32_t t1, uint32_t t2);
+
 static uint32_t select_thread_by_property(thread_comparator_fn property_cmp, const uint32_t index_low,
                                           const uint32_t index_high, const uint32_t prev_thread,
                                           const uint32_t current_thread) {
@@ -364,16 +366,19 @@ POK 默认的调度函数并不是真的 RR 调度，它是调度一个线程后
 和前面一样创建三个线程如下：
 
 ```cpp
+// 线程 1
 tattr.period = 1000;
 tattr.time_capacity = 100;
 tattr.entry = task;
 pok_thread_create(&tid, &tattr);
 
+// 线程 2
 tattr.period = 800;
 tattr.time_capacity = 200;
 tattr.entry = task;
 pok_thread_create(&tid, &tattr);
 
+// 线程 3
 tattr.period = 1000;
 tattr.time_capacity = 300;
 tattr.entry = task;
@@ -448,3 +453,121 @@ Thread 0.2 running at 260
 ```
 
 可以看出每个线程被调度后执行了三个时间片，然后切到下一个线程执行。
+
+## Weighted Round-Robin 调度
+
+WRR 调度算法是在 RR 调度基础上为线程加入了权重属性，为了实现 WRR 调度，我们给线程结构体添加了 `weight` 属性，并做了相应的初始化工作。
+
+然后编写测试程序，同样和前面类似地创建三个线程，分别指定了不同的权重：
+
+```cpp
+// 线程 1
+tattr.period = 1000;
+tattr.time_capacity = 100;
+tattr.weight = 1;
+tattr.entry = task;
+pok_thread_create(&tid, &tattr);
+
+// 线程 2
+tattr.period = 800;
+tattr.time_capacity = 200;
+tattr.weight = 2;
+tattr.entry = task;
+pok_thread_create(&tid, &tattr);
+
+// 线程 3
+tattr.period = 1000;
+tattr.time_capacity = 300;
+tattr.weight = 3;
+tattr.entry = task;
+pok_thread_create(&tid, &tattr);
+```
+
+根据 WRR 算法的预期，这三个线程的时间片长度比例应该是 1:2:3。
+
+接着实现 WRR 调度算法，由于该算法的逻辑与 RR 几乎相同，只是在重置 `rr_budget` 时所设置的值不同，于是提取了函数 `select_thread_rr`，接受一个函数指针参数用于计算重置 `rr_budget` 时应设置的值，然后可使 RR 和 WRR 算法复用代码，具体实现如下：
+
+```cpp
+typedef uint64_t rr_budget_getter_fn(uint32_t t);
+
+static uint32_t select_thread_rr(rr_budget_getter_fn budget_getter, const uint32_t index_low, const uint32_t index_high,
+                                 const uint32_t prev_thread, const uint32_t current_thread) {
+    uint32_t res;
+    uint32_t from;
+
+    if (current_thread == IDLE_THREAD) {
+        res = prev_thread;
+    } else {
+        if (pok_threads[current_thread].rr_budget > 0) {
+            pok_threads[current_thread].rr_budget--;
+        }
+        res = current_thread;
+    }
+
+    if (pok_threads[current_thread].state == POK_STATE_RUNNABLE
+        && pok_threads[current_thread].remaining_time_capacity > 0 && pok_threads[current_thread].rr_budget > 0) {
+        /* The current thread still has budget, let it run */
+        return current_thread;
+    }
+
+    from = res;
+    do {
+        res = index_low + (res - index_low + 1) % (index_high - index_low);
+    } while ((res != from) && (pok_threads[res].state != POK_STATE_RUNNABLE));
+
+    if ((res == from) && (pok_threads[res].state != POK_STATE_RUNNABLE)) {
+        res = IDLE_THREAD;
+    }
+
+    if (res != IDLE_THREAD) {
+        /* Refill RR budget for the selected thread */
+        pok_threads[res].rr_budget = budget_getter(res);
+    }
+
+    return res;
+}
+
+static uint64_t wrr_budget_getter(uint32_t t) {
+    return pok_threads[t].weight * POK_LAB_SCHED_RR_BUDGET;
+}
+
+uint32_t pok_lab_sched_part_wrr(const uint32_t index_low, const uint32_t index_high, const uint32_t prev_thread,
+                                const uint32_t current_thread) {
+    return select_thread_rr(wrr_budget_getter, index_low, index_high, prev_thread, current_thread);
+}
+```
+
+运行测试程序效果如下：
+
+```
+Thread 0.1 scheduled at 20
+Thread 0.1 running at 40
+Thread 0.1 running at 60
+Thread 0.1 running at 80
+Thread 0.2 scheduled at 80
+Thread 0.2 running at 100
+Thread 0.2 running at 120
+Thread 0.2 running at 140
+Thread 0.2 running at 160
+Thread 0.2 running at 180
+Thread 0.2 running at 200
+Thread 0.3 scheduled at 200
+Thread 0.3 running at 220
+Thread 0.3 running at 240
+Thread 0.3 running at 260
+Thread 0.3 running at 280
+Thread 0.3 running at 300
+Thread 0.3 running at 320
+Thread 0.3 running at 340
+Thread 0.3 running at 360
+Thread 0.3 running at 380
+Thread 0.1 scheduled at 380
+Thread 0.1 running at 400
+Thread 0.1 running at 420
+Thread 0.1 finished at 420, next activation: 1000
+Thread 0.2 scheduled at 420
+Thread 0.2 running at 440
+...
+```
+
+可以发现每次被调度后，线程 1 执行了 3 个时间片，线程 2 执行了 6 个时间片，线程 3 执行了 9 个时间片，结果符合预期。

@@ -54,6 +54,7 @@
 
 typedef struct {
     uint8_t priority;
+    uint8_t weight;
     uint64_t period;
     uint64_t deadline;
     uint64_t time_capacity;
@@ -78,6 +79,7 @@ typedef struct {
 
 typedef struct {
     uint8_t priority; /* Priority is from 0 to 255 */
+    uint8_t weight; /* Weight is used by WRR scheduling algorithm */
     void* entry; /* entrypoint of the thread  */
     uint64_t period;
     uint64_t deadline;
