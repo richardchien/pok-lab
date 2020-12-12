@@ -356,3 +356,95 @@ Thread 0.2 finished at 1000, deadline met, next activation: 1600
 ```
 
 可以发现调度顺序符合 EDF 策略，所有线程的 deadline 都能够满足。
+
+## Round-Robin 调度
+
+POK 默认的调度函数并不是真的 RR 调度，它是调度一个线程后，让它执行完 `time_capacity` 然后再调度下一个，这里我们把 `time_capacity` 属性理解为线程的每一个任务周期中所需执行的时间，而不是时间片长度。因此，为了实现 RR 调度，我们给线程结构体添加了一个属性，称为 `rr_budget`，这个属性表示一个线程每次被调度后允许执行的时间片数量，而一个时间片就是一次调度周期（`POK_SCHED_INTERVAL`，即 20 tick）。每次线程被调度后，将给它的 `rr_budget` 重置为初始值（通过 `POK_LAB_SCHED_RR_BUDGET` 宏设置，默认为 3），时间片用完后，会切到下一个就绪线程。
+
+和前面一样创建三个线程如下：
+
+```cpp
+tattr.period = 1000;
+tattr.time_capacity = 100;
+tattr.entry = task;
+pok_thread_create(&tid, &tattr);
+
+tattr.period = 800;
+tattr.time_capacity = 200;
+tattr.entry = task;
+pok_thread_create(&tid, &tattr);
+
+tattr.period = 1000;
+tattr.time_capacity = 300;
+tattr.entry = task;
+pok_thread_create(&tid, &tattr);
+```
+
+然后实现 RR 调度函数 `pok_lab_sched_part_rr` 如下（除了添加 `rr_budget` 属性外，不需要对内核其它地方做修改）：
+
+```cpp
+uint32_t pok_lab_sched_part_rr(const uint32_t index_low, const uint32_t index_high, const uint32_t prev_thread,
+                               const uint32_t current_thread) {
+    uint32_t res;
+    uint32_t from;
+
+    if (current_thread == IDLE_THREAD) {
+        res = prev_thread;
+    } else {
+        if (pok_threads[current_thread].rr_budget > 0) {
+            pok_threads[current_thread].rr_budget--;
+        }
+        res = current_thread;
+    }
+
+    if (pok_threads[current_thread].state == POK_STATE_RUNNABLE
+        && pok_threads[current_thread].remaining_time_capacity > 0 && pok_threads[current_thread].rr_budget > 0) {
+        /* The current thread still has budget, let it run */
+        return current_thread;
+    }
+
+    from = res;
+    do {
+        res = index_low + (res - index_low + 1) % (index_high - index_low);
+    } while ((res != from) && (pok_threads[res].state != POK_STATE_RUNNABLE));
+
+    if ((res == from) && (pok_threads[res].state != POK_STATE_RUNNABLE)) {
+        res = IDLE_THREAD;
+    }
+
+    if (res != IDLE_THREAD) {
+        /* Refill RR budget for the selected thread */
+        pok_threads[res].rr_budget = POK_LAB_SCHED_RR_BUDGET;
+    }
+
+    return res;
+}
+```
+
+这里所做的事情是根据线程类型，递减 `rr_budget`，然后判断当前线程是否还是就绪状态并且还有时间片，如果有就让它继续执行，否则切到下一个就绪线程，并重置 `rr_budget`。
+
+运行效果如下：
+
+```
+Thread 0.1 scheduled at 20
+Thread 0.1 running at 40
+Thread 0.1 running at 60
+Thread 0.1 running at 80
+Thread 0.2 scheduled at 80
+Thread 0.2 running at 100
+Thread 0.2 running at 120
+Thread 0.2 running at 140
+Thread 0.3 scheduled at 140
+Thread 0.3 running at 160
+Thread 0.3 running at 180
+Thread 0.3 running at 200
+Thread 0.1 scheduled at 200
+Thread 0.1 running at 220
+Thread 0.1 running at 240
+Thread 0.1 finished at 240, next activation: 1000
+Thread 0.2 scheduled at 240
+Thread 0.2 running at 260
+...
+```
+
+可以看出每个线程被调度后执行了三个时间片，然后切到下一个线程执行。

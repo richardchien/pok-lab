@@ -60,6 +60,7 @@ typedef struct {
     uint64_t remaining_time_capacity;
     uint64_t next_activation;
     uint64_t current_deadline;
+    uint64_t rr_budget;
     pok_state_t state;
     uint64_t end_time;
     uint64_t wakeup_time;

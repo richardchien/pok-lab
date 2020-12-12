@@ -26,6 +26,10 @@
 /* Call pok_sched every POK_SCHED_INTERVAL ticks */
 #define POK_SCHED_INTERVAL 20
 
+#ifndef POK_LAB_SCHED_RR_BUDGET
+#define POK_LAB_SCHED_RR_BUDGET 3
+#endif /* POK_LAB_SCHED_RR_BUDGET */
+
 #ifdef POK_NEEDS_PARTITIONS
 extern uint8_t pok_current_partition;
 #define POK_SCHED_CURRENT_PARTITION pok_current_partition

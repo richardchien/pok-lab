@@ -56,13 +56,45 @@ uint32_t pok_lab_sched_part_edf(const uint32_t index_low, const uint32_t index_h
     return select_thread_by_property(deadline_cmp, index_low, index_high, prev_thread, current_thread);
 }
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-
 uint32_t pok_lab_sched_part_rr(const uint32_t index_low, const uint32_t index_high, const uint32_t prev_thread,
                                const uint32_t current_thread) {
-    return IDLE_THREAD;
+    uint32_t res;
+    uint32_t from;
+
+    if (current_thread == IDLE_THREAD) {
+        res = prev_thread;
+    } else {
+        if (pok_threads[current_thread].rr_budget > 0) {
+            pok_threads[current_thread].rr_budget--;
+        }
+        res = current_thread;
+    }
+
+    if (pok_threads[current_thread].state == POK_STATE_RUNNABLE
+        && pok_threads[current_thread].remaining_time_capacity > 0 && pok_threads[current_thread].rr_budget > 0) {
+        /* The current thread still has budget, let it run */
+        return current_thread;
+    }
+
+    from = res;
+    do {
+        res = index_low + (res - index_low + 1) % (index_high - index_low);
+    } while ((res != from) && (pok_threads[res].state != POK_STATE_RUNNABLE));
+
+    if ((res == from) && (pok_threads[res].state != POK_STATE_RUNNABLE)) {
+        res = IDLE_THREAD;
+    }
+
+    if (res != IDLE_THREAD) {
+        /* Refill RR budget for the selected thread */
+        pok_threads[res].rr_budget = POK_LAB_SCHED_RR_BUDGET;
+    }
+
+    return res;
 }
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
 
 uint32_t pok_lab_sched_part_wrr(const uint32_t index_low, const uint32_t index_high, const uint32_t prev_thread,
                                 const uint32_t current_thread) {
