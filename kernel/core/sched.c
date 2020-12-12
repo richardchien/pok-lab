@@ -207,11 +207,18 @@ uint32_t pok_elect_thread(uint8_t new_partition_id) {
         if ((thread->state == POK_STATE_WAIT_NEXT_ACTIVATION) && (thread->next_activation <= now)) {
             uint64_t activation = thread->next_activation;
             uint64_t deadline = activation + thread->deadline;
-            printf("Thread %u.%u activated at %u, deadline at %u\n",
-                   (unsigned)pok_current_partition,
-                   (unsigned)i,
-                   (unsigned)activation,
-                   (unsigned)deadline);
+            if (thread->deadline > 0) {
+                printf("Thread %u.%u activated at %u, deadline at %u\n",
+                       (unsigned)pok_current_partition,
+                       (unsigned)i,
+                       (unsigned)activation,
+                       (unsigned)deadline);
+            } else {
+                printf("Thread %u.%u activated at %u\n",
+                       (unsigned)pok_current_partition,
+                       (unsigned)i,
+                       (unsigned)activation);
+            }
             thread->state = POK_STATE_RUNNABLE;
             thread->remaining_time_capacity = thread->time_capacity;
             thread->current_deadline = deadline;
@@ -263,12 +270,20 @@ uint32_t pok_elect_thread(uint8_t new_partition_id) {
                 // with non-infinite capacity (could be
                 // infinite with value -1 <--> INFINITE_TIME_CAPACITY)
                 if (POK_CURRENT_THREAD.remaining_time_capacity <= 0 && POK_CURRENT_THREAD.time_capacity > 0) {
-                    printf("Thread %u.%u finished at %u, deadline %s, next activation: %u\n",
-                           (unsigned)pok_current_partition,
-                           (unsigned)(current_thread - POK_CURRENT_PARTITION.thread_index_low),
-                           (unsigned)now,
-                           POK_CURRENT_THREAD.current_deadline >= now ? "met" : "miss",
-                           (unsigned)POK_CURRENT_THREAD.next_activation);
+                    if (POK_CURRENT_THREAD.deadline > 0) {
+                        printf("Thread %u.%u finished at %u, deadline %s, next activation: %u\n",
+                               (unsigned)pok_current_partition,
+                               (unsigned)(current_thread - POK_CURRENT_PARTITION.thread_index_low),
+                               (unsigned)now,
+                               POK_CURRENT_THREAD.current_deadline >= now ? "met" : "miss",
+                               (unsigned)POK_CURRENT_THREAD.next_activation);
+                    } else {
+                        printf("Thread %u.%u finished at %u, next activation: %u\n",
+                               (unsigned)pok_current_partition,
+                               (unsigned)(current_thread - POK_CURRENT_PARTITION.thread_index_low),
+                               (unsigned)now,
+                               (unsigned)POK_CURRENT_THREAD.next_activation);
+                    }
                     POK_CURRENT_THREAD.state = POK_STATE_WAIT_NEXT_ACTIVATION;
                 }
             }
