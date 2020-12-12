@@ -211,7 +211,7 @@ Thread 0.3 running at 1120
 
 关注第 1000 tick 处，可以看到优先级最高的线程 1 被正确地调度了。
 
-## 抢占式 EDF 调度
+### 抢占式 EDF 调度
 
 由于 POK 中原先计算 deadline 的逻辑与我们的预期不符，于是给线程结构体增加了 `current_deadline` 属性，在每次线程 activate 的时候与 `next_activation` 属性一同更新，相关代码在 `pok_elect_thread` 函数，重点如下：
 
@@ -359,7 +359,7 @@ Thread 0.2 finished at 1000, deadline met, next activation: 1600
 
 可以发现调度顺序符合 EDF 策略，所有线程的 deadline 都能够满足。
 
-## Round-Robin 调度
+### Round-Robin 调度
 
 POK 默认的调度函数并不是真的 RR 调度，它是调度一个线程后，让它执行完 `time_capacity` 然后再调度下一个，这里我们把 `time_capacity` 属性理解为线程的每一个任务周期中所需执行的时间，而不是时间片长度。因此，为了实现 RR 调度，我们给线程结构体添加了一个属性，称为 `rr_budget`，这个属性表示一个线程每次被调度后允许执行的时间片数量，而一个时间片就是一次调度周期（`POK_SCHED_INTERVAL`，即 20 tick）。每次线程被调度后，将给它的 `rr_budget` 重置为初始值（通过 `POK_LAB_SCHED_RR_BUDGET` 宏设置，默认为 3），时间片用完后，会切到下一个就绪线程。
 
@@ -454,7 +454,7 @@ Thread 0.2 running at 260
 
 可以看出每个线程被调度后执行了三个时间片，然后切到下一个线程执行。
 
-## Weighted Round-Robin 调度
+### Weighted Round-Robin 调度
 
 WRR 调度算法是在 RR 调度基础上为线程加入了权重属性，为了实现 WRR 调度，我们给线程结构体添加了 `weight` 属性，并做了相应的初始化工作。
 
