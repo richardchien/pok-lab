@@ -103,6 +103,7 @@ void pok_thread_init(void) {
     pok_threads[IDLE_THREAD].deadline = 0;
     pok_threads[IDLE_THREAD].time_capacity = 0;
     pok_threads[IDLE_THREAD].next_activation = 0;
+    pok_threads[IDLE_THREAD].current_deadline = 0;
     pok_threads[IDLE_THREAD].remaining_time_capacity = 0;
     pok_threads[IDLE_THREAD].wakeup_time = 0;
     pok_threads[IDLE_THREAD].entry = pok_arch_idle;
@@ -117,6 +118,7 @@ void pok_thread_init(void) {
         pok_threads[i].time_capacity = 0;
         pok_threads[i].remaining_time_capacity = 0;
         pok_threads[i].next_activation = 0;
+        pok_threads[i].current_deadline = 0;
         pok_threads[i].wakeup_time = 0;
         pok_threads[i].state = POK_STATE_STOPPED;
     }
@@ -163,6 +165,7 @@ pok_ret_t pok_partition_thread_create(uint32_t* thread_id, const pok_thread_attr
 
     if (attr->deadline > 0) {
         pok_threads[id].deadline = attr->deadline;
+        pok_threads[id].current_deadline = attr->deadline;
     }
 
 #ifdef POK_NEEDS_SCHED_HFPPS

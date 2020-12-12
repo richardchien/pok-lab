@@ -138,6 +138,7 @@ Thread 0.3 scheduled at 1000
 Thread 0.3 running at 1020
 ... (省略)
 Thread 0.3 finished at 1300, next activation: 2000
+...
 ```
 
 在 1000 tick 时，线程 1 和 3 都激活了，同时线程 2 当前任务完成，这时需从线程 1、3 中选一个调度，按默认调度策略，选择了“下一个就绪线程”即线程 3，而如果要按优先级，则需调度线程 1（线程 1 的优先级 99 大于线程 3 的优先级 20）。
@@ -173,37 +174,185 @@ uint32_t pok_lab_sched_part_prio(const uint32_t index_low, const uint32_t index_
 }
 ```
 
+主要逻辑就是遍历当前分区的所有线程，找到优先级最高的线程执行，这里只是粗略实现，因此直接循环遍历，实际应用场景下可以使用堆或红黑树等结构实现优先级队列。
+
 使用此调度函数再次运行测试程序，输出如下：
 
 ```
 Thread 0.1 scheduled at 20
 Thread 0.1 running at 40
-... (省略)
+...
 Thread 0.1 finished at 120, next activation: 1000
 Thread 0.2 scheduled at 120
 Thread 0.2 running at 140
-... (省略)
+...
 Thread 0.2 finished at 320, next activation: 800
 Thread 0.3 scheduled at 320
 Thread 0.3 running at 340
-... (省略)
+...
 Thread 0.3 finished at 620, next activation: 1000
 Idle at 620...
 Thread 0.2 activated at 800
 Thread 0.2 scheduled at 800
 Thread 0.2 running at 820
-... (省略)
+...
 Thread 0.1 activated at 1000
 Thread 0.3 activated at 1000
 Thread 0.2 running at 1000
 Thread 0.2 finished at 1000, next activation: 1600
 Thread 0.1 scheduled at 1000
 Thread 0.1 running at 1020
-... (省略)
+...
 Thread 0.1 finished at 1100, next activation: 2000
 Thread 0.3 scheduled at 1100
 Thread 0.3 running at 1120
-... (省略)
+...
 ```
 
-关注第 1000 tick 处，可以看到线程 1 被正确地调度了。
+关注第 1000 tick 处，可以看到优先级最高的线程 1 被正确地调度了。
+
+## 抢占式 EDF 调度
+
+由于 POK 中原先计算 deadline 的逻辑与我们的预期不符，于是给线程结构体增加了 `current_deadline` 属性，在每次线程 activate 的时候与 `next_activation` 属性一同更新，相关代码在 `pok_elect_thread` 函数，重点如下：
+
+```cpp
+if ((thread->state == POK_STATE_WAIT_NEXT_ACTIVATION) && (thread->next_activation <= now)) {
+    uint64_t activation = thread->next_activation;
+    uint64_t deadline = activation + thread->deadline;
+    printf("Thread %u.%u activated at %u, deadline at %u\n",
+            (unsigned)pok_current_partition,
+            (unsigned)i,
+            (unsigned)activation,
+            (unsigned)deadline);
+    thread->state = POK_STATE_RUNNABLE;
+    thread->remaining_time_capacity = thread->time_capacity;
+    thread->current_deadline = deadline;
+    thread->next_activation = activation + thread->period;
+}
+```
+
+编写测试程序，创建三个线程模拟不同周期、执行时间、deadline 的任务：
+
+```cpp
+// 线程 1
+tattr.period = 1000;
+tattr.time_capacity = 100;
+tattr.deadline = 1000;
+tattr.entry = task;
+pok_thread_create(&tid, &tattr);
+
+// 线程 2
+tattr.period = 800;
+tattr.time_capacity = 200;
+tattr.deadline = 600;
+tattr.entry = task;
+pok_thread_create(&tid, &tattr);
+
+// 线程 3
+tattr.period = 1000;
+tattr.time_capacity = 300;
+tattr.deadline = 500;
+tattr.entry = task;
+pok_thread_create(&tid, &tattr);
+```
+
+使用默认调度函数进行调度，输出如下：
+
+```
+Thread 0.1 scheduled at 20
+Thread 0.1 running at 40
+...
+Thread 0.1 finished at 120, deadline met, next activation: 1000
+Thread 0.2 scheduled at 120
+Thread 0.2 running at 140
+...
+Thread 0.2 finished at 320, deadline met, next activation: 800
+Thread 0.3 scheduled at 320
+Thread 0.3 running at 340
+...
+Thread 0.3 finished at 620, deadline miss, next activation: 1000
+Idle at 620...
+Thread 0.2 activated at 800, deadline at 1400
+Thread 0.2 scheduled at 800
+Thread 0.2 running at 820
+...
+Thread 0.1 activated at 1000, deadline at 2000
+Thread 0.3 activated at 1000, deadline at 1500
+Thread 0.2 running at 1000
+Thread 0.2 finished at 1000, deadline met, next activation: 1600
+...
+```
+
+可以看到线程 3 的第一个任务 deadline 要求 500 tick 完成，但实际到 620 tick 才完成，miss 了 deadline，但实际上这组任务是调度可行的，按 EDF 策略调度顺序为 3、2、1，三个线程都可以达到 deadline 要求。
+
+要实现 EDF 调度，实际上就是在每次选择线程时选择当前 deadline 最近的线程，由于此逻辑与优先级调度非常接近，都是从所有线程中选择“最XX”的，于是提取了一个 `select_thread_by_property` 函数，通过传入比较函数来控制选择策略，然后利用此函数来实现 EDF 调度函数 `pok_lab_sched_part_edf`，具体实现如下：
+
+```cpp
+static uint32_t select_thread_by_property(thread_comparator_fn property_cmp, const uint32_t index_low,
+                                          const uint32_t index_high, const uint32_t prev_thread,
+                                          const uint32_t current_thread) {
+    uint32_t t, from;
+    uint32_t max_property_thread = IDLE_THREAD;
+
+    if (current_thread == IDLE_THREAD) {
+        from = t = prev_thread;
+    } else {
+        from = t = current_thread;
+    }
+
+    /*
+     * Walk through all threads of the given partition,
+     * select the one with highest property (may be priority or deadline, etc).
+     */
+    do {
+        if (pok_threads[t].state == POK_STATE_RUNNABLE && property_cmp(t, max_property_thread) > 0) {
+            max_property_thread = t;
+        }
+        t = index_low + (t - index_low + 1) % (index_high - index_low);
+    } while (t != from);
+
+    return max_property_thread;
+}
+
+static int deadline_cmp(uint32_t t1, uint32_t t2) {
+    /* Handle threads that don't have deadlines */
+    if (pok_threads[t1].deadline == 0) return -1;
+    if (pok_threads[t2].deadline == 0) return 1;
+    /* Select the thread with earliest deadline */
+    return pok_threads[t2].current_deadline - pok_threads[t1].current_deadline;
+}
+
+uint32_t pok_lab_sched_part_edf(const uint32_t index_low, const uint32_t index_high, const uint32_t prev_thread,
+                                const uint32_t current_thread) {
+    return select_thread_by_property(deadline_cmp, index_low, index_high, prev_thread, current_thread);
+}
+```
+
+使用 EDF 调度函数再次运行测试程序，输出如下：
+
+```
+Thread 0.3 scheduled at 20
+Thread 0.3 running at 40
+...
+Thread 0.3 finished at 320, deadline met, next activation: 1000
+Thread 0.2 scheduled at 320
+Thread 0.2 running at 340
+...
+Thread 0.2 finished at 520, deadline met, next activation: 800
+Thread 0.1 scheduled at 520
+Thread 0.1 running at 540
+...
+Thread 0.1 finished at 620, deadline met, next activation: 1000
+Idle at 620...
+Thread 0.2 activated at 800, deadline at 1400
+Thread 0.2 scheduled at 800
+Thread 0.2 running at 820
+...
+Thread 0.1 activated at 1000, deadline at 2000
+Thread 0.3 activated at 1000, deadline at 1500
+Thread 0.2 running at 1000
+Thread 0.2 finished at 1000, deadline met, next activation: 1600
+...
+```
+
+可以发现调度顺序符合 EDF 策略，所有线程的 deadline 都能够满足。

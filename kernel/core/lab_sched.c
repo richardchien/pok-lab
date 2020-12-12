@@ -5,14 +5,13 @@
 #include <core/thread.h>
 #include <core/partition.h>
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
+typedef int thread_comparator_fn(uint32_t t1, uint32_t t2);
 
-uint32_t pok_lab_sched_part_prio(const uint32_t index_low, const uint32_t index_high, const uint32_t prev_thread,
-                                 const uint32_t current_thread) {
+static uint32_t select_thread_by_property(thread_comparator_fn property_cmp, const uint32_t index_low,
+                                          const uint32_t index_high, const uint32_t prev_thread,
+                                          const uint32_t current_thread) {
     uint32_t t, from;
-    uint8_t max_prio = 0;
-    uint32_t max_prio_thread = IDLE_THREAD;
+    uint32_t max_property_thread = IDLE_THREAD;
 
     if (current_thread == IDLE_THREAD) {
         from = t = prev_thread;
@@ -22,23 +21,43 @@ uint32_t pok_lab_sched_part_prio(const uint32_t index_low, const uint32_t index_
 
     /*
      * Walk through all threads of the given partition,
-     * select the one with highest priority.
+     * select the one with highest property (may be priority or deadline, etc).
      */
     do {
-        if (pok_threads[t].state == POK_STATE_RUNNABLE && pok_threads[t].priority > max_prio) {
-            max_prio = pok_threads[t].priority;
-            max_prio_thread = t;
+        if (pok_threads[t].state == POK_STATE_RUNNABLE && property_cmp(t, max_property_thread) > 0) {
+            max_property_thread = t;
         }
         t = index_low + (t - index_low + 1) % (index_high - index_low);
     } while (t != from);
 
-    return max_prio_thread;
+    return max_property_thread;
+}
+
+static int priority_cmp(uint32_t t1, uint32_t t2) {
+    /* Select the thread with highest priority */
+    return pok_threads[t1].priority - pok_threads[t2].priority;
+}
+
+uint32_t pok_lab_sched_part_prio(const uint32_t index_low, const uint32_t index_high, const uint32_t prev_thread,
+                                 const uint32_t current_thread) {
+    return select_thread_by_property(priority_cmp, index_low, index_high, prev_thread, current_thread);
+}
+
+static int deadline_cmp(uint32_t t1, uint32_t t2) {
+    /* Handle threads that don't have deadlines */
+    if (pok_threads[t1].deadline == 0) return -1;
+    if (pok_threads[t2].deadline == 0) return 1;
+    /* Select the thread with earliest deadline */
+    return pok_threads[t2].current_deadline - pok_threads[t1].current_deadline;
 }
 
 uint32_t pok_lab_sched_part_edf(const uint32_t index_low, const uint32_t index_high, const uint32_t prev_thread,
                                 const uint32_t current_thread) {
-    return IDLE_THREAD;
+    return select_thread_by_property(deadline_cmp, index_low, index_high, prev_thread, current_thread);
 }
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
 
 uint32_t pok_lab_sched_part_rr(const uint32_t index_low, const uint32_t index_high, const uint32_t prev_thread,
                                const uint32_t current_thread) {
