@@ -1,6 +1,7 @@
 #pragma once
 
 #define POK_NEEDS_DEBUG 1
+#define POK_NEEDS_SCHED_VERBOSE 1
 
 #define POK_NEEDS_THREADS 1
 #define POK_NEEDS_PARTITIONS 1
