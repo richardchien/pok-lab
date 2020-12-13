@@ -141,7 +141,7 @@ pok_ret_t pok_partition_thread_create(uint32_t* thread_id, const pok_thread_attr
      * We can create a thread only if the partition is in INIT mode
      */
     if ((pok_partitions[partition_id].mode != POK_PARTITION_MODE_INIT_COLD)
-        && (pok_partitions[partition_id].mode != POK_PARTITION_MODE_INIT_WARM)) {
+        && (pok_partitions[partition_id].mode != POK_PARTITION_MODE_INIT_WARM) && (!attr->dynamic)) {
         return POK_ERRNO_MODE;
     }
 
@@ -167,12 +167,12 @@ pok_ret_t pok_partition_thread_create(uint32_t* thread_id, const pok_thread_attr
 
     if (attr->period > 0) {
         pok_threads[id].period = attr->period;
-        pok_threads[id].next_activation = attr->period;
+        pok_threads[id].next_activation = POK_GETTICK() + attr->period;
     }
 
     if (attr->deadline > 0) {
         pok_threads[id].deadline = attr->deadline;
-        pok_threads[id].current_deadline = attr->deadline;
+        pok_threads[id].current_deadline = POK_GETTICK() + attr->deadline;
     }
 
 #ifdef POK_NEEDS_SCHED_HFPPS
@@ -190,7 +190,7 @@ pok_ret_t pok_partition_thread_create(uint32_t* thread_id, const pok_thread_attr
     stack_vaddr = pok_thread_stack_addr(partition_id, pok_partitions[partition_id].thread_index);
 
     pok_threads[id].state = POK_STATE_RUNNABLE;
-    pok_threads[id].wakeup_time = 0;
+    pok_threads[id].wakeup_time = POK_GETTICK();
     pok_threads[id].sp = pok_space_context_create(partition_id, (uint32_t)attr->entry, stack_vaddr, 0xdead, 0xbeaf);
     /*
      *  FIXME : current debug session about exceptions-handled

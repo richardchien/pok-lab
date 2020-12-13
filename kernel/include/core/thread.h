@@ -86,6 +86,7 @@ typedef struct {
     uint64_t time_capacity;
     uint32_t stack_size;
     pok_state_t state;
+    bool_t dynamic; /* This field should be marked as TRUE if creating thread in NORMAL mode */
 } pok_thread_attr_t;
 /*
  * Attributes given to create a thread
