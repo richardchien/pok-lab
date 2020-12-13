@@ -754,3 +754,156 @@ Partition 1 scheduled at 3000
 ```
 
 可以发现从分区 1 开始调度，分区 1 内部线程 1.1 和 1.2 采用 RR 策略交替执行；到第 1200 tick，分区 2 被调度；再到第 2400 tick，分区 3 被调度；一个 major frame 结束后，重新回到分区 1 执行。
+
+## 动态创建线程
+
+> 作业 3
+
+首先，将原先使用的 `POK_CONFIG_PARTITIONS_NTHREADS` 重新理解为分区内允许创建的最大线程数量，未使用的线程结构体初始状态为 `POK_STATE_STOPPED`。`pok_partition_thread_create` 函数中原先不允许 `NORMAL` 模式的分区创建线程，需要改成允许，为了不干扰之前的其它程序，这里给 `pok_thread_attr_t` 引入了一个新的属性 `dynamic`，用于标记该线程为动态创建的线程，然后在 `pok_partition_thread_create` 做个判断：
+
+```cpp
+if ((pok_partitions[partition_id].mode != POK_PARTITION_MODE_INIT_COLD)
+    && (pok_partitions[partition_id].mode != POK_PARTITION_MODE_INIT_WARM) && (!attr->dynamic)) {
+    return POK_ERRNO_MODE;
+}
+```
+
+在这里允许动态创建线程后，其它逻辑可以直接复用，无需更改。
+
+接着编写测试程序，实现了一个简易的 shell 函数，可以通过输入 1、2、3 来控制创建三种预设属性的线程，当然这里可以通过解析用户输入内容来做更复杂的创建，为了简化没有做：
+
+```cpp
+static void init_thread() {
+    char buf[512];
+    for (;;) {
+        int buf_idx = 0;
+        printf(">>> ");
+        for (;;) {
+            int ch = getc();
+            putc(ch);
+            if (ch == '\r' || ch == '\n') {
+                printf("\r\n");
+                buf[buf_idx] = '\0';
+                break;
+            } else {
+                buf[buf_idx++] = (char)ch;
+            }
+        }
+        if (buf_idx == 0) {
+            continue;
+        }
+
+        if (0 == strcmp("quit", buf)) {
+            break;
+        }
+
+        if (0 == strcmp("1", buf)) {
+            create_task(1000, 100);
+        } else if (0 == strcmp("2", buf)) {
+            create_task(800, 400);
+        } else if (0 == strcmp("3", buf)) {
+            create_task(600, 200);
+        }
+    }
+
+    printf("You quited.\n");
+    pok_thread_wait_infinite();
+}
+
+static void create_task(uint64_t period, uint64_t time_capacity) {
+    pok_thread_attr_t tattr;
+    memset(&tattr, 0, sizeof(pok_thread_attr_t));
+
+    tattr.dynamic = TRUE;
+    tattr.period = period;
+    tattr.time_capacity = time_capacity;
+    tattr.entry = task;
+
+    uint8_t tid;
+    pok_ret_t ret;
+    ret = pok_thread_create(&tid, &tattr);
+    if (ret == POK_ERRNO_OK) {
+        printf("Thread %u created, period: %u, time capacity: %u.\n",
+               (unsigned)tid,
+               (unsigned)period,
+               (unsigned)time_capacity);
+    } else if (ret == POK_ERRNO_TOOMANY) {
+        printf("Error: too many thread.\n");
+    } else {
+        printf("Unknown error occurred.\n");
+    }
+}
+```
+
+在分区的主线程中首先启动一个 init 线程作为 shell，执行 `init_thread` 函数：
+
+```cpp
+tattr.period = -1;
+tattr.time_capacity = -1;
+tattr.entry = init_thread;
+pok_thread_create(&tid, &tattr);
+```
+
+此时运行测试程序，就可以通过输入 1、2、3 来动态创建线程了，由于之前的实验中在调度函数中输出了一些调试信息，这里显得比较混乱，于是加了一个宏 `POK_NEEDS_SCHED_VERBOSE` 用于控制调度的调试信息的输出，在本题实验的测试程序中不需要开启。
+
+为了更好的查看线程的创建和运行情况，添加了一个系统调用 `POK_SYSCALL_TOP` 用于输出当前所有线程的状态信息，外部包装为 `pok_top` 函数，然后在 shell 程序中添加一个命令用于调用 `pok_top` 函数：
+
+```cpp
+// init_thread 函数
+
+if (0 == strcmp("1", buf)) {
+    create_task(1000, 100);
+} else if (0 == strcmp("2", buf)) {
+    create_task(800, 400);
+} else if (0 == strcmp("3", buf)) {
+    create_task(600, 200);
+} else if (0 == strcmp("top", buf)) {
+    pok_top();
+}
+
+// pok_top 函数在内核中的实现
+
+void pok_top() {
+    uint8_t last_pid = (uint8_t)-1;
+    for (uint32_t i = 0; i < POK_CONFIG_NB_THREADS; i++) {
+        pok_thread_t *thread = &pok_threads[i];
+        if (thread->state == POK_STATE_STOPPED) {
+            continue;
+        }
+        if (thread->partition != last_pid) {
+            printf("Partition %u:\n", (unsigned)(thread->partition + 1));
+            last_pid = thread->partition;
+        }
+        printf("  Thread %u, state: %s\n",
+               (unsigned)(i - pok_partitions[thread->partition].thread_index_low),
+               state_to_string(thread->state));
+    }
+}
+```
+
+最终运行效果如下：
+
+```
+>>> top
+Partition 1:
+  Thread 1, state: RUNNABLE
+>>> 1
+Thread 2 created, period: 1000, time capacity: 100.
+>>> 1
+Thread 3 created, period: 1000, time capacity: 100.
+>>> top
+Partition 1:
+  Thread 1, state: RUNNABLE
+  Thread 2, state: WAIT_NEXT_ACTIVATION
+  Thread 3, state: WAIT_NEXT_ACTIVATION
+>>> 3
+Thread 4 created, period: 600, time capacity: 200.
+>>> top
+Partition 1:
+  Thread 1, state: RUNNABLE
+  Thread 2, state: RUNNABLE
+  Thread 3, state: RUNNABLE
+  Thread 4, state: RUNNABLE
+```
+
+可以看到成功实现了线程的运行时动态创建。
