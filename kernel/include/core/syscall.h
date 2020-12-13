@@ -99,8 +99,10 @@ typedef enum {
     POK_SYSCALL_RTL8929_WRITE = 703,
     POK_SYSCALL_RTL8929_POLL = 704,
     POK_SYSCALL_RTL8929_CLEAR = 705,
-    POK_SYSCALL_RTL8929_INIT = 706
+    POK_SYSCALL_RTL8929_INIT = 706,
 #endif
+
+    POK_SYSCALL_TOP = 801,
 } pok_syscall_id_t;
 
 typedef struct {

@@ -2,6 +2,7 @@
 #include <libc/string.h>
 #include <core/thread.h>
 #include <core/partition.h>
+#include <core/top.h>
 #include <types.h>
 
 static void init_thread();
@@ -54,6 +55,7 @@ static void init_thread() {
         } else if (0 == strcmp("3", buf)) {
             create_task(600, 200);
         } else if (0 == strcmp("top", buf)) {
+            pok_top();
         }
     }
 
@@ -74,7 +76,10 @@ static void create_task(uint64_t period, uint64_t time_capacity) {
     pok_ret_t ret;
     ret = pok_thread_create(&tid, &tattr);
     if (ret == POK_ERRNO_OK) {
-        printf("Thread %u created.\n", (unsigned)tid);
+        printf("Thread %u created, period: %u, time capacity: %u.\n",
+               (unsigned)tid,
+               (unsigned)period,
+               (unsigned)time_capacity);
     } else if (ret == POK_ERRNO_TOOMANY) {
         printf("Error: too many thread.\n");
     } else {

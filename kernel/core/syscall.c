@@ -28,6 +28,7 @@
 #include <core/lockobj.h>
 #include <core/time.h>
 #include <core/error.h>
+#include <core/top.h>
 
 #include <middleware/port.h>
 
@@ -459,6 +460,10 @@ pok_ret_t pok_core_syscall(const pok_syscall_id_t syscall_id, const pok_syscall_
         rtl8029_init();
         break;
 #endif
+
+    case POK_SYSCALL_TOP:
+        pok_top();
+        break;
 
     /**
      * Here is the default syscall handler. In this case, the syscall
