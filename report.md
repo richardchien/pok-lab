@@ -571,3 +571,186 @@ Thread 0.2 running at 440
 ```
 
 可以发现每次被调度后，线程 1 执行了 3 个时间片，线程 2 执行了 6 个时间片，线程 3 执行了 9 个时间片，结果符合预期。
+
+## 多分区调度
+
+> 作业 1，多分区调度
+
+### Weight Round-Robin 调度
+
+POK 默认的分区调度策略是通过 `deployment.h` 中的宏定义分区调度槽，根据每个槽的时间长度和指定的分区号来调度，我们这里选择实现一个 WRR 调度算法作为不一样的调度策略，在 `deployment.h` 中不再需要定义调度槽，而是需要定义每个分区的权重，通过 `POK_CONFIG_PARTITIONS_WEIGHT` 宏给出，然后仍然像默认一样需要定义 major frame 长度 `POK_CONFIG_SCHEDULING_MAJOR_FRAME`，通过这两个宏，我们在调度器初始化时为每个分区计算出了其在一个 major frame 中允许被调度的时间长度（复用了原来的 `pok_sched_slots` 和 `pok_sched_slots_allocation` 全局变量）。
+
+具体地，我们在 `pok_sched_init` 函数中根据宏定义存在与否情况的不同，做了区别处理，以保证完全兼容此前依赖默认调度策略的程序，主要代码如下：
+
+```cpp
+void pok_sched_init(void) {
+#ifdef POK_NEEDS_PARTITIONS
+#if defined(POK_NEEDS_ERROR_HANDLING) || defined(POK_NEEDS_DEBUG)
+
+#if defined(POK_CONFIG_PARTITIONS_WEIGHT) && (POK_CONFIG_SCHEDULING_NBSLOTS == POK_CONFIG_NB_PARTITIONS)
+    /*
+     * Calculate scheduling slots according to POK_CONFIG_PARTITIONS_WEIGHT
+     */
+    uint64_t total_weight = 0;
+    for (uint8_t i = 0; i < POK_CONFIG_NB_PARTITIONS; i++) {
+        if (pok_sched_weights[i] == 0) pok_sched_weights[i] = 1;
+        total_weight += pok_sched_weights[i];
+        pok_sched_slots_allocation[i] = i;
+    }
+    uint64_t major_frame_remain = POK_CONFIG_SCHEDULING_MAJOR_FRAME;
+    for (uint8_t i = 0; i < POK_CONFIG_NB_PARTITIONS - 1; i++) {
+        pok_sched_slots[i] = pok_sched_weights[i] * POK_CONFIG_SCHEDULING_MAJOR_FRAME / total_weight;
+        major_frame_remain -= pok_sched_slots[i];
+    }
+    pok_sched_slots[POK_CONFIG_NB_PARTITIONS - 1] = major_frame_remain;
+#else
+    // ... 省略 POK 默认策略进行的相关检查
+#endif
+
+#endif
+#endif
+
+    pok_sched_current_slot = 0;
+    pok_sched_next_major_frame = POK_CONFIG_SCHEDULING_MAJOR_FRAME;
+    pok_sched_next_deadline = pok_sched_slots[0];
+    pok_sched_next_flush = 0;
+    pok_current_partition = pok_sched_slots_allocation[0];
+}
+```
+
+这里对 `pok_sched_slots` 和 `pok_sched_slots_allocation` 依照 `POK_CONFIG_PARTITIONS_WEIGHT` 进行配置后，可以完全复用 POK 默认的分区调度逻辑。
+
+编写测试程序，创建三个分区，分区分别有 2、1、1 个线程，代码如下：
+
+```cpp
+// prog1/main.c 分区 1
+
+// 线程 1.1
+tattr.period = 1000;
+tattr.time_capacity = 100;
+tattr.entry = task;
+pok_thread_create(&tid, &tattr);
+
+// 线程 1.2
+tattr.period = 500;
+tattr.time_capacity = 300;
+tattr.entry = task;
+pok_thread_create(&tid, &tattr);
+
+// prog2/main.c 分区 2
+
+// 线程 2.1
+tattr.period = 1000;
+tattr.time_capacity = 500;
+tattr.entry = task;
+pok_thread_create(&tid, &tattr);
+
+// prog3/main.c 分区 3
+
+// 线程 3.1
+tattr.period = 800;
+tattr.time_capacity = 200;
+tattr.entry = task;
+pok_thread_create(&tid, &tattr);
+```
+
+在 `deployment.h` 中配置如下：
+
+```cpp
+#define POK_CONFIG_NB_PARTITIONS 3
+#define POK_CONFIG_PARTITIONS_WEIGHT \
+    { 2, 2, 1 }
+#define POK_CONFIG_SCHEDULING_MAJOR_FRAME 5000
+
+#define POK_CONFIG_NB_THREADS 9
+#define POK_CONFIG_PARTITIONS_NTHREADS \
+    { 3, 2, 2 }
+
+#include <core/schedvalues.h>
+#define POK_CONFIG_PARTITIONS_SCHEDULER \
+    { POK_LAB_SCHED_RR, POK_LAB_SCHED_RR, POK_LAB_SCHED_RR }
+```
+
+这里设置了 major frame 为 3000 tick，三个分区的权重比例为 2:2:1，因此每个 major frame 内三个分区分别可以执行 1200、1200、600 tick，每个分区内部都使用 RR 调度算法。
+
+运行程序效果如下：
+
+```
+Thread 1.1 scheduled at 20
+Thread 1.1 running at 40
+Thread 1.1 running at 60
+Thread 1.1 running at 80
+Thread 1.2 scheduled at 80
+Thread 1.2 running at 100
+Thread 1.2 running at 120
+Thread 1.2 running at 140
+Thread 1.1 scheduled at 140
+Thread 1.1 running at 160
+Thread 1.1 running at 180
+Thread 1.1 finished at 180, next activation: 1000
+Thread 1.2 scheduled at 180
+Thread 1.2 running at 200
+...
+Thread 1.2 finished at 420, next activation: 500
+Idle at 420...
+Thread 1.2 activated at 500
+Thread 1.2 scheduled at 500
+Thread 1.2 running at 520
+...
+Thread 1.2 finished at 800, next activation: 1000
+Idle at 800...
+Thread 1.1 activated at 1000
+Thread 1.2 activated at 1000
+Thread 1.1 scheduled at 1000
+Thread 1.1 running at 1020
+Thread 1.1 running at 1040
+Thread 1.1 running at 1060
+Thread 1.2 scheduled at 1060
+Thread 1.2 running at 1080
+Thread 1.2 running at 1100
+Thread 1.2 running at 1120
+Thread 1.1 scheduled at 1120
+Thread 1.1 running at 1140
+Thread 1.1 running at 1160
+Thread 1.1 finished at 1160, next activation: 2000
+Thread 1.2 scheduled at 1160
+Thread 1.2 running at 1180
+Partition 2 scheduled at 1200
+Thread 2.1 scheduled at 1201
+Thread 2.1 running at 1220
+...
+Thread 2.1 finished at 1700, next activation: 1000
+Idle at 1700...
+Thread 2.1 activated at 1000
+Thread 2.1 scheduled at 1720
+Thread 2.1 running at 1740
+...
+Thread 2.1 finished at 2220, next activation: 2000
+Idle at 2220...
+Thread 2.1 activated at 2000
+Thread 2.1 scheduled at 2240
+Thread 2.1 running at 2260
+...
+Thread 2.1 running at 2380
+Partition 3 scheduled at 2400
+Thread 3.1 scheduled at 2401
+Thread 3.1 running at 2420
+...
+Thread 3.1 finished at 2600, next activation: 800
+Idle at 2600...
+Thread 3.1 activated at 800
+Thread 3.1 scheduled at 2620
+Thread 3.1 running at 2640
+...
+Thread 3.1 finished at 2820, next activation: 1600
+Idle at 2820...
+Thread 3.1 activated at 1600
+Thread 3.1 scheduled at 2840
+Thread 3.1 running at 2860
+...
+Thread 3.1 running at 2980
+Partition 1 scheduled at 3000
+...
+```
+
+可以发现从分区 1 开始调度，分区 1 内部线程 1.1 和 1.2 采用 RR 策略交替执行；到第 1200 tick，分区 2 被调度；再到第 2400 tick，分区 3 被调度；一个 major frame 结束后，重新回到分区 1 执行。

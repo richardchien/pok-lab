@@ -61,8 +61,24 @@ extern void pok_port_flushall(void);
 extern void pok_port_flush_partition(uint8_t);
 #endif
 
-uint64_t pok_sched_slots[POK_CONFIG_SCHEDULING_NBSLOTS] = (uint64_t[])POK_CONFIG_SCHEDULING_SLOTS;
-uint8_t pok_sched_slots_allocation[POK_CONFIG_SCHEDULING_NBSLOTS] = (uint8_t[])POK_CONFIG_SCHEDULING_SLOTS_ALLOCATION;
+#ifndef POK_CONFIG_SCHEDULING_NBSLOTS
+#define POK_CONFIG_SCHEDULING_NBSLOTS POK_CONFIG_NB_PARTITIONS
+#endif
+
+uint64_t pok_sched_slots[POK_CONFIG_SCHEDULING_NBSLOTS]
+#ifdef POK_CONFIG_SCHEDULING_SLOTS
+    = (uint64_t[])POK_CONFIG_SCHEDULING_SLOTS
+#endif
+    ;
+uint8_t pok_sched_slots_allocation[POK_CONFIG_SCHEDULING_NBSLOTS]
+#ifdef POK_CONFIG_SCHEDULING_SLOTS_ALLOCATION
+    = (uint8_t[])POK_CONFIG_SCHEDULING_SLOTS_ALLOCATION
+#endif
+    ;
+
+#ifdef POK_CONFIG_PARTITIONS_WEIGHT
+uint8_t pok_sched_weights[POK_CONFIG_NB_PARTITIONS] = (uint8_t[])POK_CONFIG_PARTITIONS_WEIGHT;
+#endif
 
 pok_sched_t pok_global_sched;
 uint64_t pok_sched_next_deadline;
@@ -83,19 +99,32 @@ void pok_sched_thread_switch(void);
 void pok_sched_init(void) {
 #ifdef POK_NEEDS_PARTITIONS
 #if defined(POK_NEEDS_ERROR_HANDLING) || defined(POK_NEEDS_DEBUG)
+
+#if defined(POK_CONFIG_PARTITIONS_WEIGHT) && (POK_CONFIG_SCHEDULING_NBSLOTS == POK_CONFIG_NB_PARTITIONS)
+    /*
+     * Calculate scheduling slots according to POK_CONFIG_PARTITIONS_WEIGHT
+     */
+    uint64_t total_weight = 0;
+    for (uint8_t i = 0; i < POK_CONFIG_NB_PARTITIONS; i++) {
+        if (pok_sched_weights[i] == 0) pok_sched_weights[i] = 1;
+        total_weight += pok_sched_weights[i];
+        pok_sched_slots_allocation[i] = i;
+    }
+    uint64_t major_frame_remain = POK_CONFIG_SCHEDULING_MAJOR_FRAME;
+    for (uint8_t i = 0; i < POK_CONFIG_NB_PARTITIONS - 1; i++) {
+        pok_sched_slots[i] = pok_sched_weights[i] * POK_CONFIG_SCHEDULING_MAJOR_FRAME / total_weight;
+        major_frame_remain -= pok_sched_slots[i];
+    }
+    pok_sched_slots[POK_CONFIG_NB_PARTITIONS - 1] = major_frame_remain;
+#else
     /*
      * We check that the total time of time frame
      * corresponds to the sum of each slot
      */
-    uint64_t total_time;
-    uint8_t slot;
-
-    total_time = 0;
-
-    for (slot = 0; slot < POK_CONFIG_SCHEDULING_NBSLOTS; slot++) {
+    uint64_t total_time = 0;
+    for (uint8_t slot = 0; slot < POK_CONFIG_SCHEDULING_NBSLOTS; slot++) {
         total_time = total_time + pok_sched_slots[slot];
     }
-
     if (total_time != POK_CONFIG_SCHEDULING_MAJOR_FRAME) {
 #ifdef POK_NEEDS_DEBUG
         printf("Major frame is not compliant with all time slots\n");
@@ -104,6 +133,8 @@ void pok_sched_init(void) {
         pok_kernel_error(POK_ERROR_KIND_KERNEL_CONFIG);
 #endif
     }
+#endif
+
 #endif
 #endif
 
@@ -209,13 +240,13 @@ uint32_t pok_elect_thread(uint8_t new_partition_id) {
             uint64_t deadline = activation + thread->deadline;
             if (thread->deadline > 0) {
                 printf("Thread %u.%u activated at %u, deadline at %u\n",
-                       (unsigned)pok_current_partition,
+                       (unsigned)pok_current_partition + 1,
                        (unsigned)i,
                        (unsigned)activation,
                        (unsigned)deadline);
             } else {
                 printf("Thread %u.%u activated at %u\n",
-                       (unsigned)pok_current_partition,
+                       (unsigned)pok_current_partition + 1,
                        (unsigned)i,
                        (unsigned)activation);
             }
@@ -260,7 +291,7 @@ uint32_t pok_elect_thread(uint8_t new_partition_id) {
         ) {
             if (POK_CURRENT_THREAD.remaining_time_capacity > 0) {
                 printf("Thread %u.%u running at %u\n",
-                       (unsigned)pok_current_partition,
+                       (unsigned)pok_current_partition + 1,
                        (unsigned)(current_thread - POK_CURRENT_PARTITION.thread_index_low),
                        (unsigned)now);
                 POK_CURRENT_THREAD.remaining_time_capacity =
@@ -272,14 +303,14 @@ uint32_t pok_elect_thread(uint8_t new_partition_id) {
                 if (POK_CURRENT_THREAD.remaining_time_capacity <= 0 && POK_CURRENT_THREAD.time_capacity > 0) {
                     if (POK_CURRENT_THREAD.deadline > 0) {
                         printf("Thread %u.%u finished at %u, deadline %s, next activation: %u\n",
-                               (unsigned)pok_current_partition,
+                               (unsigned)pok_current_partition + 1,
                                (unsigned)(current_thread - POK_CURRENT_PARTITION.thread_index_low),
                                (unsigned)now,
                                POK_CURRENT_THREAD.current_deadline >= now ? "met" : "miss",
                                (unsigned)POK_CURRENT_THREAD.next_activation);
                     } else {
                         printf("Thread %u.%u finished at %u, next activation: %u\n",
-                               (unsigned)pok_current_partition,
+                               (unsigned)pok_current_partition + 1,
                                (unsigned)(current_thread - POK_CURRENT_PARTITION.thread_index_low),
                                (unsigned)now,
                                (unsigned)POK_CURRENT_THREAD.next_activation);
@@ -343,6 +374,10 @@ void pok_sched() {
     {
 
         elected_partition = pok_elect_partition();
+        if (elected_partition != pok_current_partition) {
+            printf("Partition %u scheduled at %u\n", (unsigned)elected_partition + 1, (unsigned)POK_GETTICK());
+        }
+
         elected_thread = pok_elect_thread(elected_partition);
     }
 
@@ -353,10 +388,10 @@ void pok_sched() {
         }
         pok_partitions[pok_current_partition].current_thread = elected_thread;
         if (elected_thread == IDLE_THREAD) {
-            printf("Idle at %d...\n", (unsigned)POK_GETTICK());
+            printf("Idle at %u...\n", (unsigned)POK_GETTICK());
         } else {
-            printf("Thread %d.%d scheduled at %d\n",
-                   (unsigned)pok_current_partition,
+            printf("Thread %u.%u scheduled at %u\n",
+                   (unsigned)pok_current_partition + 1,
                    (unsigned)(elected_thread - POK_CURRENT_PARTITION.thread_index_low),
                    (unsigned)POK_GETTICK());
         }
