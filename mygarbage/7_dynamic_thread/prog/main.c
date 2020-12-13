@@ -31,12 +31,12 @@ static void init_thread() {
         printf(">>> ");
         for (;;) {
             int ch = getc();
-            putc(ch);
             if (ch == '\r' || ch == '\n') {
                 printf("\r\n");
                 buf[buf_idx] = '\0';
                 break;
             } else {
+                putc(ch);
                 buf[buf_idx++] = (char)ch;
             }
         }
