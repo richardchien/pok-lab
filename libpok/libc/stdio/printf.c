@@ -253,3 +253,10 @@ int printf(const char* format, ...) {
     va_end(args);
     return res;
 }
+
+void putc(int ch) {
+    struct s_file* out = init_buffered_output();
+    union u_arg arg = {.sint = ch};
+    print_char(&arg, out, 0);
+    close_buffered_output(out);
+}

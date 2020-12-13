@@ -23,4 +23,11 @@ int getChar() {
     pok_syscall1(POK_SYSCALL_GETCHAR, (uint32_t)&res);
     return (int)res;
 }
+
+int getc() {
+    int ch;
+    while ((ch = getChar()) == -1) {
+    }
+    return ch;
+}
 #endif
