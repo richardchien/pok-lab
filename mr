@@ -1,0 +1,8 @@
+#!/bin/bash
+
+# cd mygarbage/8_app_1;
+# cd mygarbage/9_app_2;
+# cd mygarbage/10_app_3;
+cd mygarbage/11_app_4;
+make all;
+make run
