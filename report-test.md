@@ -439,6 +439,418 @@ Partition 1 scheduled at 3000
 
 可以发现从分区 1 开始调度，分区 1 内部线程 1.1 和 1.2 采用 RR 策略交替执行；到第 1200 tick，分区 2 被调度；再到第 2400 tick，分区 3 被调度；一个 major frame 结束后，重新回到分区 1 执行。
 
+## 测试实际应用场景
+
+> 作业 2
+
+多分区单线程
+
+测试结果：满足了实时性要求
+```
+POK kernel initialized
+Thread 1.1 scheduled at 20
+[APP_3 Prog_Ctrl]: Control!
+Thread 1.1 running at 40
+Thread 1.1 running at 60
+Thread 1.1 running at 80
+Partition 2 scheduled at 100
+Thread 2.1 scheduled at 100
+[APP_3 Prog_Net]: Net!
+Thread 2.1 running at 120
+Thread 2.1 running at 140
+Thread 2.1 running at 160
+Thread 2.1 running at 180
+Partition 3 scheduled at 200
+Partition 1 scheduled at 300
+Thread 1.1 running at 320
+Thread 1.1 finished at 320, deadline met, next activation: 1220
+Idle at 320...
+Partition 2 scheduled at 400
+Thread 2.1 running at 420
+Thread 2.1 running at 440
+Thread 2.1 running at 460
+Thread 2.1 running at 480
+Partition 3 scheduled at 500
+Partition 1 scheduled at 600
+Partition 2 scheduled at 700
+Thread 2.1 running at 720
+Thread 2.1 running at 740
+Thread 2.1 running at 760
+Thread 2.1 running at 780
+Partition 3 scheduled at 800
+Partition 1 scheduled at 900
+Partition 2 scheduled at 1000
+Thread 2.1 running at 1020
+Thread 2.1 running at 1040
+Thread 2.1 running at 1060
+Thread 2.1 running at 1080
+Partition 3 scheduled at 1100
+Partition 1 scheduled at 1200
+Thread 1.1 activated at 1220, deadline at 1520
+Thread 1.1 scheduled at 1220
+Thread 1.1 running at 1240
+Thread 1.1 running at 1260
+Thread 1.1 running at 1280
+Partition 2 scheduled at 1300
+Thread 1.1 running at 1300
+Thread 1.1 finished at 1300, deadline met, next activation: 2420
+```
+
+单分区多线程
+    
+RR：优先级最高的控制进程(prog_ctrl)出现了DDL miss，可见RR在满足实时性方面令人难以满意。
+```
+POK kernel initialized
+Thread 1.1 scheduled at 20
+[APP_4 task_ctrl]: Control!
+Thread 1.1 running at 40
+Thread 1.1 running at 60
+Thread 1.1 running at 80
+Thread 1.2 scheduled at 80
+[APP_4 task_net]: Net!
+Thread 1.2 running at 100
+Thread 1.2 running at 120
+Thread 1.2 running at 140
+Thread 1.3 scheduled at 140
+[APP_4 task_video]: Video!
+Thread 1.3 running at 160
+Thread 1.3 running at 180
+Thread 1.3 running at 200
+Thread 1.1 scheduled at 200
+Thread 1.1 running at 220
+Thread 1.1 running at 240
+Thread 1.1 running at 260
+Thread 1.2 scheduled at 260
+Thread 1.2 running at 280
+Thread 1.2 running at 300
+Thread 1.2 running at 320
+Thread 1.3 scheduled at 320
+Thread 1.3 running at 340
+Thread 1.3 running at 360
+Thread 1.3 running at 380
+Thread 1.1 scheduled at 380
+Thread 1.1 running at 400
+Thread 1.1 running at 420
+Thread 1.1 running at 440
+Thread 1.2 scheduled at 440
+Thread 1.2 running at 460
+Thread 1.2 running at 480
+Thread 1.2 running at 500
+Thread 1.3 scheduled at 500
+Thread 1.3 running at 520
+Thread 1.3 running at 540
+Thread 1.3 running at 560
+Thread 1.1 scheduled at 560
+Thread 1.1 running at 580
+Thread 1.1 running at 600
+Thread 1.1 running at 620
+Thread 1.2 scheduled at 620
+Thread 1.2 running at 640
+Thread 1.2 finished at 640, deadline met, next activation: 1020
+Thread 1.3 scheduled at 640
+Thread 1.3 running at 660
+Thread 1.3 running at 680
+Thread 1.3 running at 700
+Thread 1.1 scheduled at 700
+Thread 1.1 running at 720
+Thread 1.1 running at 740
+Thread 1.1 running at 760
+Thread 1.1 finished at 760, deadline miss, next activation: 3020
+Thread 1.3 scheduled at 760
+Thread 1.3 running at 780
+Thread 1.3 running at 800
+Thread 1.3 running at 820
+Thread 1.3 running at 840
+Thread 1.3 running at 860
+Thread 1.3 running at 880
+Thread 1.3 running at 900
+Thread 1.3 running at 920
+Thread 1.3 running at 940
+Thread 1.3 running at 960
+Thread 1.3 running at 980
+Thread 1.3 running at 1000
+Thread 1.2 activated at 1020, deadline at 2020
+Thread 1.3 running at 1020
+Thread 1.3 running at 1040
+Thread 1.3 running at 1060
+Thread 1.2 scheduled at 1060
+Thread 1.2 running at 1080
+Thread 1.2 running at 1100
+Thread 1.2 running at 1120
+Thread 1.3 scheduled at 1120
+Thread 1.3 running at 1140
+Thread 1.3 running at 1160
+Thread 1.3 running at 1180
+Thread 1.2 scheduled at 1180
+Thread 1.2 running at 1200
+Thread 1.2 running at 1220
+Thread 1.2 running at 1240
+Thread 1.3 scheduled at 1240
+Thread 1.3 running at 1260
+Thread 1.3 running at 1280
+Thread 1.3 running at 1300
+Thread 1.2 scheduled at 1300
+Thread 1.2 running at 1320
+Thread 1.2 running at 1340
+Thread 1.2 running at 1360
+Thread 1.3 scheduled at 1360
+Thread 1.3 running at 1380
+Thread 1.3 running at 1400
+Thread 1.3 running at 1420
+Thread 1.2 scheduled at 1420
+Thread 1.2 running at 1440
+Thread 1.2 finished at 1440, deadline met, next activation: 2020
+Thread 1.3 scheduled at 1440
+Thread 1.3 running at 1460
+Thread 1.3 running at 1480
+Thread 1.3 running at 1500
+Thread 1.3 running at 1520
+Thread 1.3 running at 1540
+Thread 1.3 running at 1560
+Thread 1.3 running at 1580
+Thread 1.3 running at 1600
+Thread 1.3 running at 1620
+Thread 1.3 running at 1640
+Thread 1.3 running at 1660
+Thread 1.3 running at 1680
+Thread 1.3 running at 1700
+Thread 1.3 running at 1720
+Thread 1.3 finished at 1720, deadline met, next activation: 2020
+```
+优先级：在我们设计的场景中，优先级调度满足了实时性要求。
+```
+POK kernel initialized
+Thread 1.1 scheduled at 20
+[APP_4 task_ctrl]: Control!
+Thread 1.1 running at 40
+Thread 1.1 running at 60
+Thread 1.1 running at 80
+Thread 1.1 running at 100
+Thread 1.1 running at 120
+Thread 1.1 running at 140
+Thread 1.1 running at 160
+Thread 1.1 running at 180
+Thread 1.1 running at 200
+Thread 1.1 running at 220
+Thread 1.1 running at 240
+Thread 1.1 running at 260
+Thread 1.1 running at 280
+Thread 1.1 running at 300
+Thread 1.1 running at 320
+Thread 1.1 finished at 320, deadline met, next activation: 3020
+Thread 1.2 scheduled at 320
+[APP_4 task_net]: Net!
+Thread 1.2 running at 340
+Thread 1.2 running at 360
+Thread 1.2 running at 380
+Thread 1.2 running at 400
+Thread 1.2 running at 420
+Thread 1.2 running at 440
+Thread 1.2 running at 460
+Thread 1.2 running at 480
+Thread 1.2 running at 500
+Thread 1.2 running at 520
+Thread 1.2 finished at 520, deadline met, next activation: 1020
+Thread 1.3 scheduled at 520
+[APP_4 task_video]: Video!
+Thread 1.3 running at 540
+Thread 1.3 running at 560
+Thread 1.3 running at 580
+Thread 1.3 running at 600
+Thread 1.3 running at 620
+Thread 1.3 running at 640
+Thread 1.3 running at 660
+Thread 1.3 running at 680
+Thread 1.3 running at 700
+Thread 1.3 running at 720
+Thread 1.3 running at 740
+Thread 1.3 running at 760
+Thread 1.3 running at 780
+Thread 1.3 running at 800
+Thread 1.3 running at 820
+Thread 1.3 running at 840
+Thread 1.3 running at 860
+Thread 1.3 running at 880
+Thread 1.3 running at 900
+Thread 1.3 running at 920
+Thread 1.3 running at 940
+Thread 1.3 running at 960
+Thread 1.3 running at 980
+Thread 1.3 running at 1000
+Thread 1.2 activated at 1020, deadline at 2020
+Thread 1.3 running at 1020
+Thread 1.2 scheduled at 1020
+Thread 1.2 running at 1040
+Thread 1.2 running at 1060
+Thread 1.2 running at 1080
+Thread 1.2 running at 1100
+Thread 1.2 running at 1120
+Thread 1.2 running at 1140
+Thread 1.2 running at 1160
+Thread 1.2 running at 1180
+Thread 1.2 running at 1200
+Thread 1.2 running at 1220
+Thread 1.2 finished at 1220, deadline met, next activation: 2020
+Thread 1.3 scheduled at 1220
+Thread 1.3 running at 1240
+Thread 1.3 running at 1260
+Thread 1.3 running at 1280
+Thread 1.3 running at 1300
+Thread 1.3 running at 1320
+Thread 1.3 running at 1340
+Thread 1.3 running at 1360
+Thread 1.3 running at 1380
+Thread 1.3 running at 1400
+Thread 1.3 running at 1420
+Thread 1.3 running at 1440
+Thread 1.3 running at 1460
+Thread 1.3 running at 1480
+Thread 1.3 running at 1500
+Thread 1.3 running at 1520
+Thread 1.3 running at 1540
+Thread 1.3 running at 1560
+Thread 1.3 running at 1580
+Thread 1.3 running at 1600
+Thread 1.3 running at 1620
+Thread 1.3 running at 1640
+Thread 1.3 running at 1660
+Thread 1.3 running at 1680
+Thread 1.3 running at 1700
+Thread 1.3 running at 1720
+Thread 1.3 finished at 1720, deadline met, next activation: 2020
+Idle at 1720...
+Thread 1.2 activated at 2020, deadline at 3020
+Thread 1.3 activated at 2020, deadline at 4020
+Thread 1.2 scheduled at 2020
+Thread 1.2 running at 2040
+Thread 1.2 running at 2060
+Thread 1.2 running at 2080
+Thread 1.2 running at 2100
+Thread 1.2 running at 2120
+Thread 1.2 running at 2140
+Thread 1.2 running at 2160
+Thread 1.2 running at 2180
+Thread 1.2 running at 2200
+Thread 1.2 running at 2220
+Thread 1.2 finished at 2220, deadline met, next activation: 3020
+```
+EDF：在我们设计的场景中，EDF调度满足了实时性要求。
+```
+POK kernel initialized
+Thread 1.1 scheduled at 20
+[APP_4 task_ctrl]: Control!
+Thread 1.1 running at 40
+Thread 1.1 running at 60
+Thread 1.1 running at 80
+Thread 1.1 running at 100
+Thread 1.1 running at 120
+Thread 1.1 running at 140
+Thread 1.1 running at 160
+Thread 1.1 running at 180
+Thread 1.1 running at 200
+Thread 1.1 running at 220
+Thread 1.1 running at 240
+Thread 1.1 running at 260
+Thread 1.1 running at 280
+Thread 1.1 running at 300
+Thread 1.1 running at 320
+Thread 1.1 finished at 320, deadline met, next activation: 3020
+Thread 1.2 scheduled at 320
+[APP_4 task_net]: Net!
+Thread 1.2 running at 340
+Thread 1.2 running at 360
+Thread 1.2 running at 380
+Thread 1.2 running at 400
+Thread 1.2 running at 420
+Thread 1.2 running at 440
+Thread 1.2 running at 460
+Thread 1.2 running at 480
+Thread 1.2 running at 500
+Thread 1.2 running at 520
+Thread 1.2 finished at 520, deadline met, next activation: 1020
+Thread 1.3 scheduled at 520
+[APP_4 task_video]: Video!
+Thread 1.3 running at 540
+Thread 1.3 running at 560
+Thread 1.3 running at 580
+Thread 1.3 running at 600
+Thread 1.3 running at 620
+Thread 1.3 running at 640
+Thread 1.3 running at 660
+Thread 1.3 running at 680
+Thread 1.3 running at 700
+Thread 1.3 running at 720
+Thread 1.3 running at 740
+Thread 1.3 running at 760
+Thread 1.3 running at 780
+Thread 1.3 running at 800
+Thread 1.3 running at 820
+Thread 1.3 running at 840
+Thread 1.3 running at 860
+Thread 1.3 running at 880
+Thread 1.3 running at 900
+Thread 1.3 running at 920
+Thread 1.3 running at 940
+Thread 1.3 running at 960
+Thread 1.3 running at 980
+Thread 1.3 running at 1000
+Thread 1.2 activated at 1020, deadline at 2020
+Thread 1.3 running at 1020
+Thread 1.3 running at 1040
+Thread 1.3 running at 1060
+Thread 1.3 running at 1080
+Thread 1.3 running at 1100
+Thread 1.3 running at 1120
+Thread 1.3 running at 1140
+Thread 1.3 running at 1160
+Thread 1.3 running at 1180
+Thread 1.3 running at 1200
+Thread 1.3 running at 1220
+Thread 1.3 running at 1240
+Thread 1.3 running at 1260
+Thread 1.3 running at 1280
+Thread 1.3 running at 1300
+Thread 1.3 running at 1320
+Thread 1.3 running at 1340
+Thread 1.3 running at 1360
+Thread 1.3 running at 1380
+Thread 1.3 running at 1400
+Thread 1.3 running at 1420
+Thread 1.3 running at 1440
+Thread 1.3 running at 1460
+Thread 1.3 running at 1480
+Thread 1.3 running at 1500
+Thread 1.3 running at 1520
+Thread 1.3 finished at 1520, deadline met, next activation: 2020
+Thread 1.2 scheduled at 1520
+Thread 1.2 running at 1540
+Thread 1.2 running at 1560
+Thread 1.2 running at 1580
+Thread 1.2 running at 1600
+Thread 1.2 running at 1620
+Thread 1.2 running at 1640
+Thread 1.2 running at 1660
+Thread 1.2 running at 1680
+Thread 1.2 running at 1700
+Thread 1.2 running at 1720
+Thread 1.2 finished at 1720, deadline met, next activation: 2020
+Idle at 1720...
+Thread 1.2 activated at 2020, deadline at 3020
+Thread 1.3 activated at 2020, deadline at 4020
+Thread 1.2 scheduled at 2020
+Thread 1.2 running at 2040
+Thread 1.2 running at 2060
+Thread 1.2 running at 2080
+Thread 1.2 running at 2100
+Thread 1.2 running at 2120
+Thread 1.2 running at 2140
+Thread 1.2 running at 2160
+Thread 1.2 running at 2180
+Thread 1.2 running at 2200
+Thread 1.2 running at 2220
+Thread 1.2 finished at 2220, deadline met, next activation: 3020
+```
+
 ## 动态创建线程
 
 > 作业 3
