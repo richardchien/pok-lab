@@ -755,6 +755,152 @@ Partition 1 scheduled at 3000
 
 可以发现从分区 1 开始调度，分区 1 内部线程 1.1 和 1.2 采用 RR 策略交替执行；到第 1200 tick，分区 2 被调度；再到第 2400 tick，分区 3 被调度；一个 major frame 结束后，重新回到分区 1 执行。
 
+## 设计实现应用场景
+
+> 作业 2
+
+我们设计了一个应用场景：汽车驾驶。其中包含三个实时进程：
+
+    (1)prog_ctrl：控制进程，用于处理汽车的控制信号，优先级最高，有硬实时要求，绝对不能miss deadline；
+    (2)prog_net：网络进程，用于收发诸如导航之类的网络信息，优先级次高，软实时要求，可以容许一定的miss率；
+    (3)prog_video：视频进程，用于在屏幕上显示UI、导航等信息，优先级最低，软实时要求，但耗时较长。
+
+我们使用多分区单线程和单分区多线程两种方式模拟了这个应用场景。
+
+多分区单线程：
+
+prog_ctrl（控制进程）：
+```cpp
+int main() {
+    uint32_t tid;
+    pok_thread_attr_t tattr;
+    memset(&tattr, 0, sizeof(pok_thread_attr_t));
+
+    tattr.time_capacity = 80;
+    tattr.period = 1200;
+    tattr.deadline = 300;
+    tattr.entry = task;
+    pok_thread_create(&tid, &tattr);
+
+    pok_partition_set_mode(POK_PARTITION_MODE_NORMAL);
+    pok_thread_wait_infinite();
+    return 0;
+}
+
+static void task() {
+    printf("[APP_3 Prog_Ctrl]: Control!\n");
+    for (;;) {
+    }
+}
+```
+prog_net（网络进程）：
+```cpp
+int main() {
+    uint32_t tid;
+    pok_thread_attr_t tattr;
+    memset(&tattr, 0, sizeof(pok_thread_attr_t));
+
+    tattr.time_capacity = 50;
+    tattr.period = 300;
+    tattr.deadline = 200;
+    tattr.entry = task;
+    pok_thread_create(&tid, &tattr);
+
+    pok_partition_set_mode(POK_PARTITION_MODE_NORMAL);
+    pok_thread_wait_infinite();
+    return 0;
+}
+
+static void task() {
+    printf("[APP_3 Prog_Net]: Net!\n");
+    for (;;) {
+    }
+}
+```
+prog_video（视频进程）：
+```cpp
+int main() {
+    uint32_t tid;
+    pok_thread_attr_t tattr;
+    memset(&tattr, 0, sizeof(pok_thread_attr_t));
+
+    tattr.time_capacity = 200;
+    tattr.period = 900;
+    tattr.deadline = 900;
+    tattr.entry = task;
+    pok_thread_create(&tid, &tattr);
+
+    pok_partition_set_mode(POK_PARTITION_MODE_NORMAL);
+    pok_thread_wait_infinite();
+    return 0;
+}
+
+static void task() {
+    printf("[APP_3 Prog_Video]: Video!\n");
+    for (;;) {
+    }
+}
+```
+测试结果：
+由于pok系统的分区设计，只有在参数精心设计的情况下，才能满足实时性要求。否则会出现某一或某些任务周期性miss的现象。
+
+
+单分区多线程：
+
+```cpp
+int main() {
+    uint32_t tid;
+    pok_thread_attr_t tattr;
+    memset(&tattr, 0, sizeof(pok_thread_attr_t));
+
+    tattr.priority = 40;
+    tattr.period = 3000;
+    tattr.time_capacity = 300;
+    tattr.deadline = 500;
+    tattr.entry = task_ctrl;
+    pok_thread_create(&tid, &tattr);
+
+    tattr.priority = 30;
+    tattr.period = 1000;
+    tattr.time_capacity = 200;
+    tattr.deadline = 1000;
+    tattr.entry = task_net;
+    pok_thread_create(&tid, &tattr);
+
+    tattr.priority = 10;
+    tattr.period = 2000;
+    tattr.time_capacity = 1000;
+    tattr.deadline = 2000;
+    tattr.entry = task_video;
+    pok_thread_create(&tid, &tattr);
+
+    pok_partition_set_mode(POK_PARTITION_MODE_NORMAL);
+    pok_thread_wait_infinite();
+    return 0;
+}
+
+static void task_ctrl() {
+    printf("[APP_4 task_ctrl]: Control!\n");
+    for (;;) {
+    }
+}
+
+static void task_net() {
+    printf("[APP_4 task_net]: Net!\n");
+    for (;;) {
+    }
+}
+
+static void task_video() {
+    printf("[APP_4 task_video]: Video!\n");
+    for (;;) {
+    }
+}
+```
+测试结果：
+我们调整了若干次参数以模拟不同情景下的调度，结果均能较好完成调度任务。pok的同一分区的线程之间的切换是受调度策略控制的。所以我们尝试了RR、优先级、EDF调度，发现优先级调度和EDF调度能更好地满足我们设计地应用场景下的实时性需求。
+
+
 ## 动态创建线程
 
 > 作业 3
@@ -907,3 +1053,4 @@ Partition 1:
 ```
 
 可以看到成功实现了线程的运行时动态创建。
+
