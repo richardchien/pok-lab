@@ -524,3 +524,207 @@ void pok_top() {
     }
 }
 ```
+
+## 多级反馈队列调度算法
+
+### 背景
+
+RR、FIFO、SJF 等等调度算法都有各自的缺点，但是 MLFQ 算法能够较好的避免它们的缺点而又有其优势。
+
+### 算法分析
+
+MLFQ 算法维护了多个队列，代表不同优先级。算法采取不同队列优先级不同，同一队列轮转的方式，一段时间后，将所有未完成任务加入最高优先级队列重新开始。
+
+MLFQ 算法总结下来遵循以下 6 条规则：
+
+1. 如果两个任务在不同优先级队列，优先运行优先级高的队列的任务
+2. 如果任务处于同一优先级，则退化为 RR 调度
+3. 任务到来时处于最高优先级
+4. 当某一队列的时间片用完之后，任务即进入下一优先级的队列
+5. 高优先级队列的时间片短，低优先级队列的时间片长
+6. 经过一段时间之后，把所有未做完的工作重新加入最高优先级的队列
+
+MLFQ 算法首先有优先级的区别，可以优先完成紧急的任务，当一个任务短时间内完不成时，会进入到低优先级队列进行“集中攻坚”，这样既可以优先完成“短时任务”，又不会让长时间任务产生饥饿。
+
+### 代码片段
+
+```cpp
+// config.h
+#pragma once
+#define THREAD_NUM 5 //Thread number
+#define Q_NUM      3 //Queue number
+#define S          25 //Flush time
+```
+
+该文件定义了一些配置宏：
+
+- THREAD_NUM 定义了线程数量
+- Q_NUM 定义了不同优先级的队列的数量
+- S 定义了经过 S 时间重新把未完成任务加入优先级最高的队列
+
+```cpp
+// mlfq.cpp
+
+/*-------------------------------------------------------------------
+| Data struct definition and variable                               |
+*-------------------------------------------------------------------*/
+typedef struct thread {
+    int pid;
+    int priority;
+    int dura_time;
+    int total_time;
+    int sli_time;
+} thread_t;
+
+int cnt = 0;
+thread_t *current;
+queue<thread_t*> q[Q_NUM];
+thread_t threads[THREAD_NUM];
+int que_time[Q_NUM] = {
+    1,
+    2,
+    3
+};
+```
+
+这个文件是整个模拟调度的核心逻辑部分。
+
+数据结构字段定义了 thread 数据结构来模拟线程，其中 dura_time 为需要运行的总时间，total_time 是实际已经运行的总时间，sli_time 是当前线程已经运行了的时间片数；定义了 cnt 来计算当前经过的总时间，用于周期性把未做完的任务加入第一个队列；current 指针保存了当前进程的信息；q 数组保存了不同优先级的队列中的进程指针；线程数组用于保存线程信息；que_time 用于定义每个队列的基本时间片。
+
+```cpp
+/*-------------------------------------------------------------------
+| Initialize the data struct and variable                           |
+*-------------------------------------------------------------------*/
+void init() {
+    srand((unsigned)time(NULL));
+    for (int i = 0; i < THREAD_NUM; i++) {
+        threads[i].pid = i;
+        threads[i].priority = 0;
+        threads[i].dura_time = rand() % 20 + 1;
+        threads[i].total_time = 0;
+        threads[i].sli_time = 0;
+        q[0].push(&threads[i]);
+    }
+    current = NULL;
+}
+```
+
+初始化函数初始化了线程信息，其中线程需要的总的运行时间由 rand 函数给定。
+
+```cpp
+/*-------------------------------------------------------------------
+| Add all left task to the first priority queue                     |
+*-------------------------------------------------------------------*/
+void flush() {
+    cout << "Flush!" << endl;
+    for (int i = 1; i < Q_NUM; i++) {
+        while (!q[i].empty()) {
+            q[0].push(q[i].front());
+            q[i].front()->priority = 0;
+            q[i].pop();
+        }
+    }
+    if (current != NULL) {
+        current->priority = 0;
+        q[0].push(current);
+        current = NULL;
+    }
+}
+```
+
+flush 函数用于把所有未完成的任务重新填充到优先级最高的队列中。
+
+```cpp
+/*-------------------------------------------------------------------
+| Chose the thread to run                                           |
+*-------------------------------------------------------------------*/
+void chose_thread() {
+    if (cnt >= S) {
+        cnt = 0;
+        flush();
+    }
+    if (current != NULL && current->total_time < current->dura_time) {
+        int ins_pos = min(Q_NUM - 1, current->priority + 1);
+        current->priority = ins_pos;
+        current->sli_time = 0;
+        q[ins_pos].push(current);
+    }
+    
+    thread_t* temp = NULL;
+    for (int i = 0; i < Q_NUM; i++) {
+        while(!q[i].empty()) {
+            temp = q[i].front();
+            q[i].pop();
+            goto next;
+        }
+    }
+
+next:
+    current = temp;
+}
+```
+
+chose_thread 函数用于调度时选择一个线程来运行。首先判断是否需要 flush。之后判断当前 current 是否是已经运行完的函数，如果不是，则将其加入到下一队列。如果是，则在下面找到新线程之后直接替换。
+
+```cpp
+/*-------------------------------------------------------------------
+| Sched function                                                    |
+*-------------------------------------------------------------------*/
+void sched()
+{
+    if (current == NULL) {
+        chose_thread();
+        return;
+    }
+    if (current -> sli_time < que_time[current->priority] && current -> total_time < current -> dura_time) {
+        return;
+    }
+    chose_thread();
+}
+```
+
+sched 函数实现调度抽象。如果 current 为空，则直接选一个进程进行运行，如果 current 线程的队列时间片没有用完，直接返回继续运行，其他的情况则直接选择一个进程替换掉 current 并把 current 入队。
+
+```cpp
+/*-------------------------------------------------------------------
+| Run the simulation progress                                       |
+*-------------------------------------------------------------------*/
+void run() {
+    while (1) {
+        sched();
+        Sleep(700);
+        if (current == NULL) {
+            break;
+        }
+        cout << "Thead " << current->pid + 1 << " running! Total left running time: " <<current->dura_time -     current->total_time - 1<< endl;
+        current->sli_time++;
+        current->total_time++;
+        cnt++;
+    }
+}
+```
+
+run 函数用于整个模拟过程的抽象，可以在 main 中多次调用多次模拟。且 run 函数会做一些全局变量的修改，以及打印这一个时间片运行的线程的信息。
+
+```cpp
+/*-------------------------------------------------------------------
+| Function entrance                                                 |
+*-------------------------------------------------------------------*/
+int main()
+{
+    int r = 1;
+    while (r) {
+        init();
+        run();
+        cout << "Run again?(input 1 or 0) ";
+        cin >> r;
+        while (r != 0 && r != 1) {
+            printf("Wrong key, please retry! ");
+            cin >> r;
+        }
+    }
+    return 0;
+}
+```
+
+main 函数完成了多次运行的功能，在每次运行完都会询问是否再次运行，输入 1 再次运行，输入 0 退出。
